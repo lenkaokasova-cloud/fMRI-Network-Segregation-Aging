@@ -1,22 +1,29 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Download a small subset of OpenNeuro ds005752 for preprocessing demonstration.
-# Replace SUB with the participant you choose from the OpenNeuro browser.
+set -euo pipefail
+
+# Download a minimal MRI-only subset of OpenNeuro ds005752 for a first
+# preprocessing demonstration with fMRIPrep.
+#
+# Usage:
+#   bash code/01_download_openneuro_subset.sh
+#   bash code/01_download_openneuro_subset.sh sub-ON01016
 
 DATASET="ds005752"
-TARGET_DIR="$HOME/Desktop/fMRI-Network-Segregation-Aging/data/raw/ds005752"
-SUB="sub-ON52083"
+SUBJECT="${1:-sub-ON01016}"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TARGET_DIR="${REPO_ROOT}/data/raw/${DATASET}"
 
-mkdir -p "$TARGET_DIR"
+mkdir -p "${TARGET_DIR}"
 
 openneuro-py download \
-  --dataset="$DATASET" \
-  --target-dir="$TARGET_DIR" \
-  --include=dataset_description.json \
-  --include=participants.tsv \
-  --include=participants.json \
-  --include=${SUB}/ses-01/anat/* \
-  --include=${SUB}/ses-01/func/* \
-  --include=${SUB}/ses-01/fmap/*
+  --dataset="${DATASET}" \
+  --target_dir="${TARGET_DIR}" \
+  --include="dataset_description.json" \
+  --include="participants.tsv" \
+  --include="participants.json" \
+  --include="${SUBJECT}/ses-01/anat/*" \
+  --include="${SUBJECT}/ses-01/func/*" \
+  --include="${SUBJECT}/ses-01/fmap/*"
 
-echo "Download complete for $SUB"
+printf 'Download complete for %s into %s\n' "${SUBJECT}" "${TARGET_DIR}"
