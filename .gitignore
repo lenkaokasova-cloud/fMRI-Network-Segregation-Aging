@@ -216,3 +216,37 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Neuroimaging data - do not upload
+data/
+*.nii
+*.nii.gz
+*.mgz
+*.gii
+*.h5
+*.hdf5
+
+# fMRIPrep / BIDS derivatives
+derivatives/
+work/
+fmriprep/
+sourcedata/
+
+# Participant/confidential metadata
+participants.tsv
+phenotype/
+*.tsv
+*.csv
+
+# Logs and temporary files
+logs/
+*.log
+*.tmp
+
+# Mac system files
+.DS_Store
+
+# Environment/private files
+.env
+*.key
+license.txt
