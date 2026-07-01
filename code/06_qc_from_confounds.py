@@ -9,6 +9,10 @@ from pathlib import Path
 from statistics import mean, median
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_SCRUB_FD_THRESHOLD = 0.5
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Summarize fMRIPrep confounds files into simple QC metrics."
@@ -20,7 +24,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--subject",
-        default="sub-ON01016",
+        required=True,
         help="BIDS subject ID to summarize, for example sub-ON01016.",
     )
     parser.add_argument(
@@ -28,7 +32,23 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional output TSV path. Defaults to data/processed/qc/<subject>_qc_summary.tsv.",
     )
+    parser.add_argument(
+        "--scrub-fd-threshold",
+        type=float,
+        default=DEFAULT_SCRUB_FD_THRESHOLD,
+        help=(
+            "Framewise-displacement threshold used to estimate how many volumes would "
+            "remain after frame censoring."
+        ),
+    )
     return parser.parse_args()
+
+
+def resolve_project_path(path_str: str) -> Path:
+    path = Path(path_str)
+    if path.is_absolute():
+        return path
+    return PROJECT_ROOT / path
 
 
 def parse_float(value: str) -> float | None:
@@ -40,10 +60,10 @@ def parse_float(value: str) -> float | None:
     return number
 
 
-def summarize_confounds(confounds_file: Path) -> dict[str, object]:
+def summarize_confounds(confounds_file: Path, scrub_fd_threshold: float) -> dict[str, object]:
     with confounds_file.open() as f:
-      reader = csv.DictReader(f, delimiter="\t")
-      rows = list(reader)
+        reader = csv.DictReader(f, delimiter="\t")
+        rows = list(reader)
 
     if not rows:
         raise ValueError(f"No rows found in {confounds_file}")
@@ -60,10 +80,16 @@ def summarize_confounds(confounds_file: Path) -> dict[str, object]:
         name for name in rows[0].keys() if name.startswith("non_steady_state_outlier")
     ]
     nonsteady_count = 0
+    scrubbed_count = 0
     for row in rows:
         flagged = any(row.get(col, "") == "1" for col in nonsteady_columns)
         if flagged:
             nonsteady_count += 1
+        fd_value = parse_float(row.get("framewise_displacement", ""))
+        if flagged or (fd_value is not None and fd_value > scrub_fd_threshold):
+            scrubbed_count += 1
+
+    retained_count = len(rows) - scrubbed_count
 
     return {
         "subject_id": confounds_file.name.split("_ses-")[0],
@@ -82,6 +108,11 @@ def summarize_confounds(confounds_file: Path) -> dict[str, object]:
         "pct_fd_gt_0p5": round(100 * sum(x > 0.5 for x in fd_valid) / len(fd_valid), 2)
         if fd_valid
         else "",
+        "scrub_fd_threshold": round(scrub_fd_threshold, 3),
+        "n_scrubbed": scrubbed_count,
+        "pct_scrubbed": round(100 * scrubbed_count / len(rows), 2),
+        "n_retained_after_scrub": retained_count,
+        "pct_retained_after_scrub": round(100 * retained_count / len(rows), 2),
         "mean_dvars": round(mean(dvars_valid), 6) if dvars_valid else "",
         "mean_std_dvars": round(mean(std_dvars_valid), 6) if std_dvars_valid else "",
     }
@@ -89,19 +120,19 @@ def summarize_confounds(confounds_file: Path) -> dict[str, object]:
 
 def main() -> None:
     args = parse_args()
-    derivatives_dir = Path(args.derivatives_dir)
+    derivatives_dir = resolve_project_path(args.derivatives_dir)
     func_dir = derivatives_dir / args.subject / "ses-01" / "func"
     confounds_files = sorted(func_dir.glob("*desc-confounds_timeseries.tsv"))
 
     if not confounds_files:
         raise FileNotFoundError(f"No confounds files found in {func_dir}")
 
-    summaries = [summarize_confounds(path) for path in confounds_files]
+    summaries = [summarize_confounds(path, args.scrub_fd_threshold) for path in confounds_files]
 
     output_path = (
         Path(args.output)
         if args.output
-        else Path("data/processed/qc") / f"{args.subject}_qc_summary.tsv"
+        else resolve_project_path(f"data/processed/qc/{args.subject}_qc_summary.tsv")
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -115,7 +146,8 @@ def main() -> None:
     for summary in summaries:
         print(
             f"{summary['run_label']}: mean FD={summary['mean_fd']}, "
-            f"FD>0.2mm={summary['n_fd_gt_0p2']}, FD>0.5mm={summary['n_fd_gt_0p5']}"
+            f"FD>0.2mm={summary['n_fd_gt_0p2']}, FD>0.5mm={summary['n_fd_gt_0p5']}, "
+            f"retained={summary['n_retained_after_scrub']}"
         )
 
 
