@@ -1,20 +1,30 @@
 #!/usr/bin/env python3
 
+# What this script does:
+#   Combines automated QC, manual HTML review, and output existence checks to
+#   decide which subjects pass into the QC-pass sample.
+# How to run it:
+#   Run from the repo root with:
+#   python code/primary/09_build_clean_sample.py
+# Main outputs:
+#   data/processed/screening/ds005752_qc_pass_sample.tsv
+#   data/processed/screening/ds005752_qc_pass_sample_decisions.tsv
+
 from __future__ import annotations
 
 import argparse
 import csv
+import json
 from pathlib import Path
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANUAL_QC = "data/processed/qc/manual_fmriprep_report_review.tsv"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Build the final clean younger/older sample after download, "
+            "Build the QC-pass younger/older sample after download, "
             "fMRIPrep, automated QC, and manual report review."
         )
     )
@@ -46,7 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--mean-fd-max",
         type=float,
-        default=0.25,
+        default=0.2,
         help="Maximum allowed mean FD for the forward resting-state run.",
     )
     parser.add_argument(
@@ -58,16 +68,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-volumes",
         type=int,
-        default=180,
+        default=200,
         help="Minimum required number of volumes in the forward resting-state run.",
     )
     parser.add_argument(
         "--min-retained-volumes",
         type=int,
-        default=150,
+        default=180,
         help=(
-            "Minimum required number of volumes remaining after censoring "
-            "nonsteady volumes and FD spikes."
+            "Legacy retained-volume threshold. This is ignored whenever "
+            "--min-retained-minutes is set."
+        ),
+    )
+    parser.add_argument(
+        "--min-retained-minutes",
+        type=float,
+        default=7.5,
+        help=(
+            "Minimum retained time in minutes after censoring. This is the "
+            "primary current QC rule and overrides --min-retained-volumes."
         ),
     )
     parser.add_argument(
@@ -75,7 +94,7 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_MANUAL_QC,
         help=(
             "Manual fMRIPrep report-review TSV produced by "
-            "code/06_prepare_manual_qc_review.py."
+            "code/primary/07_prepare_manual_qc_review.py."
         ),
     )
     parser.add_argument(
@@ -87,12 +106,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output",
-        default="data/processed/screening/ds005752_clean_age_sample.tsv",
-        help="Output TSV of included clean subjects.",
+        default="data/processed/screening/ds005752_qc_pass_sample.tsv",
+        help="Output TSV of included QC-pass subjects.",
     )
     parser.add_argument(
         "--decisions-output",
-        default="data/processed/screening/ds005752_clean_age_sample_decisions.tsv",
+        default="data/processed/screening/ds005752_qc_pass_sample_decisions.tsv",
         help="Output TSV with inclusion and exclusion decisions for all candidates.",
     )
     return parser.parse_args()
@@ -128,6 +147,13 @@ def load_manual_qc_rows(path: Path) -> dict[str, dict[str, str]]:
         return {row["subject_id"]: row for row in reader}
 
 
+def load_repetition_time(path: Path) -> float | None:
+    with path.open() as f:
+        metadata = json.load(f)
+    value = metadata.get("RepetitionTime")
+    return float(value) if value is not None else None
+
+
 def normalize_manual_qc_status(value: str | None) -> str:
     text = (value or "").strip().lower()
     if text in {"1", "pass", "passed", "true", "yes"}:
@@ -137,7 +163,9 @@ def normalize_manual_qc_status(value: str | None) -> str:
     return "pending"
 
 
-def write_rows(path: Path, fieldnames: list[str], rows: list[dict[str, object]]) -> None:
+def write_rows(
+    path: Path, fieldnames: list[str], rows: list[dict[str, object]]
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter="\t")
@@ -158,15 +186,20 @@ def main() -> None:
 
     if args.require_manual_qc and not manual_qc_path.exists():
         raise FileNotFoundError(
-            "Manual QC review file is missing. Run code/06_prepare_manual_qc_review.py "
+            "Manual QC review file is missing. Run code/primary/07_prepare_manual_qc_review.py "
             "and complete the TSV after checking each fMRIPrep HTML report."
         )
 
     young_rows = load_rows(young_input)
     older_rows = load_rows(older_input)
-    candidates = [("young", row) for row in young_rows] + [("older", row) for row in older_rows]
-    manual_qc_rows = load_manual_qc_rows(manual_qc_path) if manual_qc_path.exists() else {}
+    candidates = [("young", row) for row in young_rows] + [
+        ("older", row) for row in older_rows
+    ]
+    manual_qc_rows = (
+        load_manual_qc_rows(manual_qc_path) if manual_qc_path.exists() else {}
+    )
 
+    # This is the step where the automated QC numbers and the manual HTML review finally meet.
     decisions: list[dict[str, object]] = []
     included: list[dict[str, object]] = []
 
@@ -181,7 +214,9 @@ def main() -> None:
             None,
         )
         confounds_path = next(
-            func_dir.glob(f"{subject}_ses-01_task-rest_dir-forward_desc-confounds_timeseries.tsv"),
+            func_dir.glob(
+                f"{subject}_ses-01_task-rest_dir-forward_desc-confounds_timeseries.tsv"
+            ),
             None,
         )
         json_path = next(
@@ -193,7 +228,9 @@ def main() -> None:
         report_path = derivatives_dir / f"{subject}.html"
         qc_row = load_forward_qc(qc_dir, subject)
         manual_qc_row = manual_qc_rows.get(subject, {})
-        manual_qc_status = normalize_manual_qc_status(manual_qc_row.get("manual_qc_status"))
+        manual_qc_status = normalize_manual_qc_status(
+            manual_qc_row.get("manual_qc_status")
+        )
 
         decision = "include"
         reason = "Accepted for connectivity analysis."
@@ -202,6 +239,9 @@ def main() -> None:
         pct_fd = ""
         n_retained_after_scrub = ""
         pct_retained_after_scrub = ""
+        repetition_time_seconds = ""
+        total_run_minutes = ""
+        retained_minutes_after_scrub = ""
 
         if not raw_subject_dir.exists():
             decision = "exclude"
@@ -227,7 +267,7 @@ def main() -> None:
                 decision = "exclude"
                 reason = (
                     "QC summary predates the current pipeline. Rerun "
-                    "code/06_qc_from_confounds.py for this subject."
+                    "code/primary/08_qc_from_confounds.py for this subject."
                 )
             else:
                 n_volumes = int(qc_row["n_volumes"])
@@ -235,22 +275,41 @@ def main() -> None:
                 pct_fd = float(qc_row["pct_fd_gt_0p2"])
                 n_retained_after_scrub = int(qc_row["n_retained_after_scrub"])
                 pct_retained_after_scrub = float(qc_row["pct_retained_after_scrub"])
+                repetition_time = load_repetition_time(json_path)
+                if repetition_time is not None:
+                    repetition_time_seconds = round(repetition_time, 3)
+                    total_run_minutes = round((n_volumes * repetition_time) / 60.0, 2)
+                    retained_minutes_after_scrub = round(
+                        (n_retained_after_scrub * repetition_time) / 60.0, 2
+                    )
                 if n_volumes < args.min_volumes:
                     decision = "exclude"
                     reason = f"Forward run has only {n_volumes} volumes (< {args.min_volumes})."
+                elif args.min_retained_minutes is not None:
+                    # Retained minutes is the main current rule because it stays comparable if TR differs.
+                    if repetition_time is None:
+                        decision = "exclude"
+                        reason = "Forward-run JSON is missing RepetitionTime."
+                    elif retained_minutes_after_scrub < args.min_retained_minutes:
+                        decision = "exclude"
+                        reason = (
+                            f"Only {retained_minutes_after_scrub:.2f} minutes remain after "
+                            f"censoring (< {args.min_retained_minutes:.2f})."
+                        )
                 elif n_retained_after_scrub < args.min_retained_volumes:
                     decision = "exclude"
                     reason = (
                         f"Only {n_retained_after_scrub} volumes remain after censoring "
                         f"(< {args.min_retained_volumes})."
                     )
-                elif mean_fd >= args.mean_fd_max:
+
+                if decision == "include" and mean_fd >= args.mean_fd_max:
                     decision = "exclude"
                     reason = (
                         f"Mean FD {mean_fd:.3f} mm exceeded the threshold of "
                         f"{args.mean_fd_max:.3f} mm."
                     )
-                elif pct_fd >= args.pct_fd_0p2_max:
+                elif decision == "include" and pct_fd >= args.pct_fd_0p2_max:
                     decision = "exclude"
                     reason = (
                         f"{pct_fd:.2f}% of volumes exceeded FD > 0.2 mm, above the "
@@ -275,6 +334,9 @@ def main() -> None:
             "n_volumes": n_volumes,
             "n_retained_after_scrub": n_retained_after_scrub,
             "pct_retained_after_scrub": pct_retained_after_scrub,
+            "repetition_time_seconds": repetition_time_seconds,
+            "total_run_minutes": total_run_minutes,
+            "retained_minutes_after_scrub": retained_minutes_after_scrub,
             "mean_fd": mean_fd,
             "pct_fd_gt_0p2": pct_fd,
             "manual_qc_status": manual_qc_status,

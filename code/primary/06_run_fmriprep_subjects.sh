@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
 
+# What this script does:
+#   Runs fMRIPrep for the selected subjects and then updates the confounds-based
+#   QC summaries and the manual-review TSV.
+# How to run it:
+#   Run from the repo root with:
+#   export FS_LICENSE=$HOME/license.txt
+#   bash code/primary/06_run_fmriprep_subjects.sh
+# Main outputs:
+#   data/derivatives/fmriprep/
+#   data/logs/fmriprep/
+#   data/processed/qc/
+
 set -euo pipefail
 
 # Run fMRIPrep, confounds-based QC, and manual-review template generation
@@ -7,20 +19,20 @@ set -euo pipefail
 #
 # Usage:
 #   export FS_LICENSE=$HOME/license.txt
-#   bash code/05_run_fmriprep_subjects.sh
-#   bash code/05_run_fmriprep_subjects.sh data/processed/screening/ds005752_mri_participants_age_50_75_remote_anat_forward.tsv
-#   bash code/05_run_fmriprep_subjects.sh sub-ON01016 sub-ON39099
+#   bash code/primary/06_run_fmriprep_subjects.sh
+#   bash code/primary/06_run_fmriprep_subjects.sh data/processed/screening/ds005752_mri_participants_age_50_75_remote_anat_forward.tsv
+#   bash code/primary/06_run_fmriprep_subjects.sh sub-ON01016 sub-ON39099
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 BIDS_DIR="${REPO_ROOT}/data/raw/ds005752"
 OUT_DIR="${REPO_ROOT}/data/derivatives/fmriprep"
 WORK_DIR="${REPO_ROOT}/data/work/fmriprep"
 QCDIR="${REPO_ROOT}/data/processed/qc"
 LOG_DIR="${REPO_ROOT}/data/logs/fmriprep"
-NTHREADS="${FMRIPREP_NTHREADS:-6}"
-OMP_NTHREADS="${FMRIPREP_OMP_NTHREADS:-4}"
-MEM_MB="${FMRIPREP_MEM_MB:-12000}"
+NTHREADS="${FMRIPREP_NTHREADS:-4}"
+OMP_NTHREADS="${FMRIPREP_OMP_NTHREADS:-2}"
+MEM_MB="${FMRIPREP_MEM_MB:-10000}"
 OUTPUT_RES="${FMRIPREP_OUTPUT_RES:-2}"
 USE_FREESURFER="${FMRIPREP_USE_FREESURFER:-0}"
 OUTPUT_T1W="${FMRIPREP_OUTPUT_T1W:-0}"
@@ -33,6 +45,7 @@ YOUNG_FALLBACK_INPUT="${REPO_ROOT}/data/processed/screening/ds005752_mri_partici
 OLDER_DEFAULT_INPUT="${REPO_ROOT}/data/processed/screening/ds005752_mri_participants_age_50_75_remote_anat_forward.tsv"
 
 if [[ -f "${YOUNG_SELECTED_INPUT}" ]]; then
+  # If I already chose the younger preprocessing subset, I want this script to follow that by default.
   YOUNG_DEFAULT_INPUT="${YOUNG_SELECTED_INPUT}"
 else
   YOUNG_DEFAULT_INPUT="${YOUNG_FALLBACK_INPUT}"
@@ -140,6 +153,7 @@ subject_outputs_complete() {
   local confounds_file="${func_dir}/${subject}_ses-01_task-rest_dir-forward_desc-confounds_timeseries.tsv"
   local json_file="${func_dir}/${subject}_ses-01_task-rest_dir-forward_space-MNI152NLin2009cAsym_res-${OUTPUT_RES}_desc-preproc_bold.json"
 
+  # I use these four files as the minimum proof that the forward run is ready for analysis.
   [[ -f "${report_file}" && -f "${bold_file}" && -f "${confounds_file}" && -f "${json_file}" ]]
 }
 
@@ -162,6 +176,7 @@ run_fmriprep_subject() {
     SKIPPED_SUBJECTS+=("${subject}")
   else
     if [[ "${FORCE_FMRIPREP}" != "1" && -f "${report_file}" ]]; then
+      # A report on its own is not enough, so partial outputs trigger a clean rerun here.
       printf 'Found partial outputs for %s. Rerunning because the required forward outputs are incomplete.\n' "${subject}"
     fi
 
@@ -207,15 +222,17 @@ run_fmriprep_subject() {
   if ! subject_outputs_complete "${subject}"; then
     printf 'Required forward outputs are still incomplete for %s after the run. Skipping QC.\n' "${subject}" >&2
     record_status "${subject}" "incomplete_outputs" "Subject report or forward outputs are incomplete after run."
-    if ! contains_subject "${subject}" "${FAILED_SUBJECTS[@]}"; then
+    # On macOS Bash 3.2, empty arrays can trip `set -u` unless expanded with a default.
+    if ! contains_subject "${subject}" "${FAILED_SUBJECTS[@]:-}"; then
       FAILED_SUBJECTS+=("${subject}")
     fi
     return 1
   fi
 
   printf 'Running QC summary for %s...\n' "${subject}"
-  python "${SCRIPT_DIR}/06_qc_from_confounds.py" --subject "${subject}"
-  if ! contains_subject "${subject}" "${SKIPPED_SUBJECTS[@]}"; then
+  # I regenerate the QC summary right away so the screening tables stay in sync with the newest run.
+  python "${SCRIPT_DIR}/08_qc_from_confounds.py" --subject "${subject}"
+  if ! contains_subject "${subject}" "${SKIPPED_SUBJECTS[@]:-}"; then
     record_status "${subject}" "completed" "${subject_log}"
     COMPLETED_SUBJECTS+=("${subject}")
   fi
@@ -264,6 +281,7 @@ SKIPPED_SUBJECTS=()
 MISSING_RAW_SUBJECTS=()
 
 for subject in "${SUBJECTS[@]}"; do
+  # I run subjects one-by-one here so a single failure does not automatically ruin the whole batch.
   if run_fmriprep_subject "${subject}"; then
     :
   elif [[ "${CONTINUE_ON_ERROR}" == "1" ]]; then
@@ -274,7 +292,7 @@ for subject in "${SUBJECTS[@]}"; do
   fi
 done
 
-python "${SCRIPT_DIR}/06_prepare_manual_qc_review.py" "${SUBJECTS[@]}"
+python "${SCRIPT_DIR}/07_prepare_manual_qc_review.py" "${SUBJECTS[@]}"
 
 printf '\nFinished fMRIPrep and QC for %s requested subjects.\n' "${#SUBJECTS[@]}"
 printf 'Update data/processed/qc/manual_fmriprep_report_review.tsv after reviewing the HTML reports.\n'

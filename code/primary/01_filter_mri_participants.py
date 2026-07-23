@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 
+# What this script does:
+#   Keeps only the participants marked as MRI-eligible in the raw OpenNeuro
+#   participants table.
+# How to run it:
+#   Run from the repo root with:
+#   python code/primary/01_filter_mri_participants.py
+# Main output:
+#   data/processed/screening/ds005752_mri_participants.tsv
+
 from __future__ import annotations
 
 import argparse
@@ -7,7 +16,7 @@ import csv
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,6 +57,7 @@ def main() -> None:
     output_path = resolve_project_path(args.output)
 
     fieldnames, rows = load_rows(participants_path)
+    # I only keep the participants who were explicitly marked as MRI-eligible.
     filtered_rows = [row for row in rows if row.get("MRI") == "1"]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 
+# What this script does:
+#   Reads the fMRIPrep confounds file for a subject and turns it into a simple
+#   QC summary with motion and retained-data measures.
+# How to run it:
+#   Run from the repo root with:
+#   python code/primary/08_qc_from_confounds.py --subject sub-ON01016
+# Main output:
+#   data/processed/qc/sub-*_qc_summary.tsv
+
 from __future__ import annotations
 
 import argparse
@@ -9,7 +18,7 @@ from pathlib import Path
 from statistics import mean, median
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SCRUB_FD_THRESHOLD = 0.5
 
 
@@ -81,6 +90,7 @@ def summarize_confounds(confounds_file: Path, scrub_fd_threshold: float) -> dict
     ]
     nonsteady_count = 0
     scrubbed_count = 0
+    # For this simple QC summary, I treat non-steady-state volumes and FD spikes as scrubbed.
     for row in rows:
         flagged = any(row.get(col, "") == "1" for col in nonsteady_columns)
         if flagged:

@@ -1,16 +1,25 @@
 #!/usr/bin/env bash
 
+# What this script does:
+#   Downloads the selected ds005752 subjects from OpenNeuro into the local raw
+#   BIDS folder.
+# How to run it:
+#   Run from the repo root with:
+#   bash code/primary/05_download_openneuro_subjects.sh
+# Main output:
+#   Subject folders inside data/raw/ds005752/
+
 set -euo pipefail
 
 # Download selected ds005752 subjects with anat/, func/, and fmap/ if present.
 #
 # Usage:
-#   bash code/04_download_openneuro_subjects.sh
-#   bash code/04_download_openneuro_subjects.sh data/processed/screening/ds005752_mri_participants_age_20_25_remote_anat_forward.tsv
-#   bash code/04_download_openneuro_subjects.sh sub-ON01016 sub-ON39099
+#   bash code/primary/05_download_openneuro_subjects.sh
+#   bash code/primary/05_download_openneuro_subjects.sh data/processed/screening/ds005752_mri_participants_age_20_25_remote_anat_forward.tsv
+#   bash code/primary/05_download_openneuro_subjects.sh sub-ON01016 sub-ON39099
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DATASET="ds005752"
 TARGET_DIR="${REPO_ROOT}/data/raw/${DATASET}"
 OPENNEURO_PYTHON="${OPENNEURO_PYTHON:-$(head -n 1 "$(command -v openneuro-py)" | sed 's/^#!//')}"
@@ -19,6 +28,7 @@ YOUNG_FALLBACK_INPUT="${REPO_ROOT}/data/processed/screening/ds005752_mri_partici
 OLDER_DEFAULT_INPUT="${REPO_ROOT}/data/processed/screening/ds005752_mri_participants_age_50_75_remote_anat_forward.tsv"
 
 if [[ -f "${YOUNG_SELECTED_INPUT}" ]]; then
+  # If I already fixed a younger preprocessing list, I want that to be the default download input.
   YOUNG_DEFAULT_INPUT="${YOUNG_SELECTED_INPUT}"
 else
   YOUNG_DEFAULT_INPUT="${YOUNG_FALLBACK_INPUT}"
@@ -99,6 +109,7 @@ includes = [
 ]
 
 try:
+    # I ask for fmap too when it exists, but I do not want the whole download to fail if it does not.
     d.download(
         dataset=dataset,
         target_dir=target_dir,
@@ -126,6 +137,7 @@ SUBJECTS=()
 for input in "${INPUTS[@]}"; do
   while IFS= read -r subject; do
     [[ -z "${subject}" ]] && continue
+    # This keeps the download queue unique even if the same subject shows up twice across inputs.
     append_unique_subject "${subject}"
   done < <(collect_subjects_from_arg "${input}")
 done

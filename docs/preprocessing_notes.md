@@ -1,266 +1,361 @@
-# NIMH Age-Analysis Workflow
+# Preprocessing Notes
 
-This project is now limited to one scientifically consistent workflow for OpenNeuro `ds005752`:
+These are my working notes for the locked preprocessing branch I am actually using.
 
-1. identify `MRI=1` participants
-2. split them into the younger and older age bands of interest
-3. keep only subjects with remote raw `anat` plus forward resting-state `func`
-4. download only those candidates
-5. preprocess all retained subjects with the same `fMRIPrep` settings
-6. apply explicit QC thresholds
-7. compute network segregation using the same atlas and confound strategy for everyone
-8. test age-group effects while controlling for sex and motion
+## 1. Main branch I am treating as primary
 
-## Scientific Design
+The main dissertation branch is now:
 
-### Dataset
+- final sample file:
+  [ds005752_final_analysis_sample_tr_3s.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/screening/ds005752_final_analysis_sample_tr_3s.tsv)
+- total `n = 44`
+- younger `n = 33`
+- older `n = 11`
+- only `TR = 3 s`
 
-- OpenNeuro `ds005752`
-- healthy NIMH research volunteers
-- raw BIDS dataset requiring preprocessing before connectivity analysis
+Older mixed-TR branches and the old balanced branches are not the main workflow anymore. If I mention them, it should only be as sensitivity or historical branches.
 
-### Default age bands
+## 2. Where this pipeline sits methodologically
 
-- younger: `20-25`
-- older: `50-75`
+The current preprocessing branch is basically in line with:
 
-You can change these with script arguments, but the repository defaults are now tuned to this comparison.
+- `BIDS`-based dataset screening and organization (`Gorgolewski et al., 2016`)
+- `fMRIPrep` for the anatomical and functional preprocessing backbone (`Esteban et al., 2019`)
+- study-specific denoising done later rather than inside `fMRIPrep`
+- a motion + `aCompCor` nuisance model without making global signal regression the default (`Behzadi et al., 2007`; `Muschelli et al., 2014`; `Murphy and Fox, 2017`)
 
-### Raw data requirements
+So overall this is not a strange pipeline. It is pretty recognizable for resting-state fMRI.
 
-A participant is considered a raw-data candidate only if remote metadata show:
+## 3. Sample flow I ended up with
 
-- structural MRI (`anat`)
-- forward resting-state BOLD (`task-rest_dir-forward`)
+Current sample flow:
 
-This is stricter than simply checking `MRI=1`, and it avoids downloading subjects who cannot enter the current connectivity pipeline.
+- `239` participants marked `MRI = 1`
+- younger age band (`20-25`): `69`
+- older age band (`50-75`): `29`
+- remote candidates with both `anat` and forward resting-state `func`:
+  - younger `58`
+  - older `22`
+- QC-pass preprocessed sample:
+  - younger `39`
+  - older `15`
+- final `TR = 3 s` sample:
+  - younger `33`
+  - older `11`
 
-### Younger preprocessing-selection rule
+The sample-flow figure for this is:
 
-The younger pool is larger than the number of subjects needed for preprocessing, so the repository now uses a fixed pre-processing selection rule before download.
+- [sample_flow_primary.png](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/qc/reporting/figures/sample_flow_primary.png)
 
-Default younger-selection targets:
+## 4. What counted as raw-data eligibility
 
-- primary younger preprocessing set: `25` subjects
-- backup younger set: `10` subjects
-- age targets: `20:1`, `21:4`, `22:7`, `23:6`, `24:4`, `25:3`
-- sex targets for the primary set: `17 female`, `8 male`
-- release targets for the primary set: `17 release_1`, `8 release_2`
+I only treated a participant as eligible for preprocessing if remote OpenNeuro metadata showed:
 
-Selection principles:
+- structural MRI `anat`
+- forward resting-state BOLD `task-rest_dir-forward`
 
-- keep already downloaded or already preprocessed younger subjects when they fit the balancing targets
-- preserve spread across the full `20-25` age band instead of taking mostly ages `22-23`
-- keep the younger set closer to the expected older sample structure rather than forcing an artificial `50/50` sex split
-- choose backups in advance so QC replacements are not decided post hoc
+This was stricter than just keeping everyone with `MRI = 1`.
 
-This selection step is only for deciding whom to preprocess first. Final inclusion still depends on the same automated and manual QC rules for both age groups.
+## 5. fMRIPrep settings
 
-### Preprocessing requirement
+Main preprocessing used:
 
-All final analysis subjects should be preprocessed in the same way with `fMRIPrep`. Do not mix preprocessing pipelines across subjects.
+- `fMRIPrep 25.2.5`
+- container `nipreps/fmriprep:25.2.5`
+- `--output-spaces MNI152NLin2009cAsym:res-2`
+- `--nthreads 4`
+- `--omp-nthreads 2`
+- `--mem_mb 10000`
+- `--fs-no-reconall`
 
-### QC defaults
+So the final sample is a volumetric MNI-space sample at `2 mm` resolution.
 
-The clean-sample builder now defaults to:
+## 6. What fMRIPrep actually did
 
-- minimum forward-run volumes: `180`
-- minimum retained volumes after censoring: `150`
-- maximum mean FD: `0.25 mm`
-- maximum percent of volumes with `FD > 0.2 mm`: `25%`
-- required manual `fMRIPrep` HTML report review: `pass`
+For the processed sample, `fMRIPrep` did:
 
-These defaults are more dissertation-defensible for an aging resting-state study because they combine subject-level motion exclusion, within-subject frame censoring, and visual review of preprocessing quality. Mean FD is still carried forward as an analysis covariate.
+- BIDS validation
+- anatomical conforming and reference building
+- skull stripping / brain extraction
+- tissue segmentation into GM, WM, and CSF
+- slice-timing correction
+- rigid-body motion correction
+- BOLD-to-T1w co-registration
+- normalization to `MNI152NLin2009cAsym`
+- resampling to `res-2`
+- confounds extraction
+- subject HTML report generation
 
-### Connectivity analysis choices
+The main functional file later used in analysis is:
 
-- atlas: Schaefer 200 parcels
-- network labels: Yeo 7
-- filtering: `0.008-0.09 Hz`
-- confounds: motion parameters, motion derivatives, white matter, CSF, first six `aCompCor` components
-- frame censoring: remove nonsteady-state volumes and volumes with `FD > 0.5 mm`
-- run used: forward resting-state run only
+- `sub-*_ses-01_task-rest_dir-forward_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz`
 
-This means the final analysis no longer relies on confound regression alone. It now combines nuisance regression with frame censoring, which is easier to justify in the motion-control literature.
+## 7. What fMRIPrep did not do
 
-### Main statistical models
+In the main branch, it did not include:
 
-The final analysis script runs:
+- fieldmap-based distortion correction
+- `FreeSurfer` surface reconstruction
+- extra spatial smoothing of the `desc-preproc_bold` images
+- final study-specific nuisance regression
+- final study-specific temporal filtering
 
-1. a global segregation model
-   `global_segregation ~ age_group + sex + mean_fd`
+Those last two are handled later in my own denoising script.
 
-2. a higher-order vs sensory-motor interaction model
-   `segregation ~ age_group * network_type + sex + mean_fd`
+## 8. Why the omitted steps are still okay for this project
 
-3. a network-specific model
-   `segregation ~ age_group * network + sex + mean_fd`
+### No fieldmap correction
 
-It also writes a continuous-age sensitivity model for global segregation, but the primary workflow is the younger-vs-older comparison because the repo is now organized around explicit age bands.
+I did not use fieldmaps because:
 
-## Step-by-Step Use
+- they were not available consistently across the final pool
+- where they existed, they were not always linked properly to the resting-state runs in a way `fMRIPrep` could use
 
-### 1. Create the environment
+So I thought one consistent no-fieldmap branch was better than mixing corrected and uncorrected subjects.
 
-```bash
-conda env create -f environment.yml
-conda activate fmri-aging
-```
+Still, this should be written up honestly as a limitation, especially because frontal and temporal regions can be affected by susceptibility distortion.
 
-### 2. Filter to `MRI=1`
+### No FreeSurfer
 
-```bash
-python code/01_filter_mri_participants.py
-```
+I did not need `FreeSurfer` because this project is:
 
-Output:
+- volumetric
+- atlas-based
+- done in MNI space
 
-- `data/processed/screening/ds005752_mri_participants.tsv`
+So skipping `recon-all` saved a lot of time without removing something I actually needed for the analysis.
 
-### 3. Split into younger and older age groups
+### No extra smoothing
 
-```bash
-python code/02_split_age_groups.py
-```
+I did not apply additional smoothing before parcel extraction because:
 
-Default outputs:
+- parcel averaging already smooths in a practical sense
+- extra smoothing can blur signal across parcel borders
+- that can reduce parcel-level specificity
 
-- `data/processed/screening/ds005752_mri_participants_age_20_25.tsv`
-- `data/processed/screening/ds005752_mri_participants_age_50_75.tsv`
+That is also in line with concerns in parcel-based connectivity work (`Alakorkko et al., 2017`; `Scheinost et al., 2014`).
 
-### 4. Screen remote raw-file availability
+## 9. QC rules for getting into the clean sample
 
-```bash
-python code/03_screen_remote_anat_forward_rest.py
-```
+A participant only entered the clean preprocessed pool if:
 
-This adds remote metadata columns and then creates the download-ready candidate lists.
+- the required forward-run outputs existed
+- manual `fMRIPrep` review was marked `pass`
+- the run had at least `200` acquired volumes
+- at least `7.5` minutes remained after censoring
+- `mean_fd < 0.20 mm`
+- `pct_fd_gt_0p2 < 25%`
+
+I used retained time rather than retained volume count because the broader processed dataset originally included more than one TR, so retained minutes was the fairer comparison.
+
+Important note to myself:
+
+- `7.5` minutes here is a minimum inclusion rule
+- it is not meant to be presented as an ideal or optimal scan length
+
+These rules fit fairly well with the standard motion and censoring literature (`Power et al., 2014`; `Satterthwaite et al., 2013`; `Ciric et al., 2017`).
+
+## 10. Atlas overlay QC before denoising
+
+Before denoising, I check atlas alignment with:
+
+- [10_check_atlas_overlay.py](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/code/primary/10_check_atlas_overlay.py)
+
+This overlays the `Schaefer 200 / Yeo 7` atlas onto each participant's normalized `T1w` image in MNI `2 mm` space.
+
+The point of this step is just to make sure the atlas sits sensibly on the normalized anatomy before parcel extraction.
+
+Outputs:
+
+- `data/processed/qc/atlas_overlay/figures/`
+- [atlas_overlay_summary.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/qc/atlas_overlay/atlas_overlay_summary.tsv)
+
+## 11. Study-specific denoising
+
+Main denoising is done by:
+
+- [11_run_denoising.py](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/code/primary/11_run_denoising.py)
+
+Main library:
+
+- `nilearn.maskers.NiftiLabelsMasker`
+- cleaning backend `nilearn.signal.clean`
+- `nilearn 0.13.1`
+
+## 12. What goes into denoising
+
+For each subject, the script loads:
+
+- forward preprocessed BOLD image
+- confounds TSV
+- BOLD JSON
+- confounds JSON
+
+The subject-specific `RepetitionTime` comes from the BOLD JSON, so filtering uses the correct TR.
+
+## 13. Main censoring rule
+
+In the main branch I censor volumes that are:
+
+- marked as non-steady-state by `fMRIPrep`
+- or have `framewise_displacement > 0.5 mm`
+
+The main branch does not automatically add:
+
+- DVARS-based censoring
+- adjacent-frame expansion
+
+Those are treated as sensitivity options instead.
+
+So this is a reasonable scrub rule, but I should describe it as moderate rather than ultra-conservative.
+
+## 14. Nuisance regressors in the main branch
+
+The main nuisance model includes:
+
+- 6 rigid-body motion parameters
+- first derivatives of those 6 motion parameters
+- mean white-matter signal
+- mean CSF signal
+- first 6 `aCompCor` components
+
+The main branch does not include global signal regression. GSR is only kept as a separate sensitivity branch.
+
+That is a defensible choice, but I should write it as one accepted approach rather than the only correct one (`Murphy and Fox, 2017`).
+
+## 15. Note to self on aCompCor
+
+The first six `aCompCor` components come from the `fMRIPrep` confounds file. I am treating them as a fixed nuisance model, not tuning them subject by subject.
+
+This follows the usual `CompCor` logic of modeling structured non-neural variance from nuisance tissue regions (`Behzadi et al., 2007`; `Muschelli et al., 2014`).
+
+In the current primary sample, cumulative variance explained by the first six `aCompCor` components was:
+
+- mean `0.2696`
+- median `0.2588`
+- range `0.1495` to `0.6164`
+
+This is recorded in:
+
+- [subject_denoising_summary.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/denoising/metrics/subject_denoising_summary.tsv)
+
+## 16. Physiological noise note
+
+I did not find explicit cardiac or respiratory recordings in the raw BIDS search, so I could not include model-based physiological regressors.
+
+So physiological noise is only being handled indirectly through:
+
+- WM signal
+- CSF signal
+- `aCompCor`
+
+That means physiological noise is reduced, but not fully modeled (`Birn, 2012`).
+
+## 17. Denoising order in the main branch
+
+With `sample_mask` and Butterworth filtering, the effective order is:
+
+1. flag censored volumes from non-steady-state status and `FD > 0.5 mm`
+2. pass the censor mask into `nilearn.signal.clean`
+3. spline-interpolate flagged volumes so filtering can be applied
+4. detrend
+5. band-pass filter (`0.008-0.09 Hz`)
+6. re-apply censoring
+7. regress out confounds
+8. standardize the final parcel time series
+
+This matters because filtering and regression can interact badly if done in a sloppy order (`Lindquist et al., 2019`).
+
+## 18. Denoising outputs
+
+Main denoising outputs are:
+
+- denoised parcel time series:
+  `data/processed/denoising/timeseries/sub-*_forward_timeseries.npy`
+- [subject_denoising_summary.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/denoising/metrics/subject_denoising_summary.tsv)
+- [denoising_settings.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/denoising/metrics/denoising_settings.tsv)
+- [atlas_labels.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/denoising/metrics/atlas_labels.tsv)
+
+## 19. Extra QC reporting I added later
+
+To make the QC story stronger, the workflow now also writes:
+
+- sample-flow figure
+- retained-minutes distribution
+- FD/DVARS/censor traces
+- QC-FC summary tables
+- QC-FC distribution figure
+- QC-FC distance-dependence figure
+- within-network denominator-stability figure
+
+These are generated by:
+
+- [16_build_qc_reporting.py](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/code/utilities/16_build_qc_reporting.py)
 
 Key outputs:
 
-- `data/processed/screening/ds005752_mri_participants_age_20_25_remote_anat_forward.tsv`
-- `data/processed/screening/ds005752_mri_participants_age_50_75_remote_anat_forward.tsv`
+- `data/processed/qc/reporting/figures/`
+- `data/processed/qc/reporting/motion_traces/`
+- [qcfc_summary.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/qc/reporting/qcfc_summary.tsv)
+- [qcfc_edge_summary.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/qc/reporting/qcfc_edge_summary.tsv)
 
-These are the tables to use when deciding who to download.
+These QC-FC outputs are there to show the residual motion pattern honestly, not to pretend motion is gone completely.
 
-### 5. Choose the younger subjects to preprocess first
+## 20. Sensitivity branches I now have
 
-```bash
-python code/03a_select_younger_preprocessing_subset.py
-```
+The preprocessing / denoising side now includes these named sensitivity branches:
 
-Key outputs:
+- GSR branch
+- Schaefer-100 branch
+- partial-correlation branch
+- adjacent-frame scrub branch
 
-- `data/processed/screening/ds005752_mri_participants_age_20_25_preprocessing_primary.tsv`
-- `data/processed/screening/ds005752_mri_participants_age_20_25_preprocessing_backup.tsv`
-- `data/processed/screening/ds005752_mri_participants_age_20_25_preprocessing_plan.tsv`
+For the adjacent-frame branch, each flagged motion spike is expanded by:
 
-Use the primary TSV as the younger download/preprocessing list. The backup TSV should only be used if a primary younger subject later fails QC or cannot be processed.
+- `1` previous volume
+- `2` following volumes
 
-### 6. Download the selected raw subjects
+That branch is stored under:
 
-```bash
-bash code/04_download_openneuro_subjects.sh
-```
+- `data/processed/sensitivity/adjacent_scrub/`
 
-If the younger primary-selection TSV exists, the download script uses it by default for the younger group and still uses the full older `*_remote_anat_forward.tsv` table for the older group. You can also pass one or more TSV files or individual subject IDs explicitly.
+The partial-correlation branch is stored under:
 
-### 7. Run `fMRIPrep` and QC
+- `data/processed/sensitivity/partial_correlation/`
 
-```bash
-export FS_LICENSE=$HOME/license.txt
-bash code/05_run_fmriprep_subjects.sh
-```
+## 21. Main limitations I still need to say clearly
 
-This script:
+Even with the improvements, I should still say explicitly that:
 
-- runs `fMRIPrep` on the selected subjects
-- skips existing reports unless `FMRIPREP_FORCE=1`
-- runs `code/06_qc_from_confounds.py` after each subject
-- refreshes `data/processed/qc/manual_fmriprep_report_review.tsv`
+- fieldmap correction was not available in a consistent usable form
+- the main censoring rule is transparent and defensible, but not the most conservative possible
+- physiological recordings were not available
+- the no-`GSR` branch is one valid choice, not the only one
 
-If the younger primary-selection TSV exists, this script also uses it by default for the younger group.
+Being open about that makes the workflow look stronger, not weaker.
 
-QC outputs:
+## 22. Atlas interpretation boundary
 
-- `data/processed/qc/sub-ON*_qc_summary.tsv`
-- `data/processed/qc/manual_fmriprep_report_review.tsv`
+The main atlas is cortical only.
 
-Open each subject's `fMRIPrep` HTML report and update the manual review TSV. Mark `manual_qc_status` as `pass` only when the structural mask, BOLD-to-T1w alignment, T1w-to-MNI alignment, and forward-run BOLD mask all look acceptable.
+So the `Limbic` label here means the cortical Schaefer/Yeo limbic network. It does not mean I am directly measuring hippocampus, amygdala, thalamus, basal ganglia, or cerebellum.
 
-### 8. Build the final clean sample
+That is worth keeping in mind when writing anything about memory or limbic effects.
 
-```bash
-python code/07_build_clean_sample.py
-```
+## 23. Reproducibility files
 
-Key outputs:
+Current reproducibility files:
 
-- `data/processed/screening/ds005752_clean_age_sample.tsv`
-- `data/processed/screening/ds005752_clean_age_sample_decisions.tsv`
+- [software_versions.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/reproducibility/software_versions.tsv)
+- [workflow_context.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/reproducibility/workflow_context.tsv)
+- [fmri_aging_environment.yml](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/reproducibility/fmri_aging_environment.yml)
 
-The clean sample file contains only included subjects. The decisions file shows every candidate and the reason for inclusion or exclusion.
+Main implementation details are also recoverable from:
 
-Subjects now need all of the following to enter the final sample:
+- [06_run_fmriprep_subjects.sh](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/code/primary/06_run_fmriprep_subjects.sh)
+- [11_run_denoising.py](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/code/primary/11_run_denoising.py)
+- [denoising_settings.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/denoising/metrics/denoising_settings.tsv)
 
-- downloaded raw data
-- required forward-run `fMRIPrep` outputs
-- a confounds-based QC summary
-- a manual `fMRIPrep` report-review pass
-- at least `180` acquired forward-run volumes
-- at least `150` retained volumes after censoring
-- mean FD below `0.25 mm`
-- fewer than `25%` volumes above `FD > 0.2 mm`
+Current workflow snapshot commit:
 
-### 9. Compute connectivity and segregation
-
-```bash
-python code/08_run_connectivity_analysis.py
-```
-
-Key outputs:
-
-- `data/processed/connectivity/metrics/subject_global_segregation.tsv`
-- `data/processed/connectivity/metrics/subject_network_segregation.tsv`
-- `data/processed/connectivity/metrics/atlas_labels.tsv`
-
-### 10. Run the final age analysis
-
-```bash
-python code/09_run_age_group_analysis.py
-```
-
-Key outputs:
-
-- `data/processed/analysis/sample_summary.tsv`
-- `data/processed/analysis/model_coefficients.tsv`
-- `data/processed/analysis/analysis_summary.md`
-- `data/processed/analysis/figures/`
-
-## Practical Recommendation
-
-Do not preprocess all `MRI=1` participants immediately.
-
-Use the workflow in this order:
-
-1. screen remote availability
-2. download only candidates with `anat + forward rest`
-3. preprocess those candidates
-4. exclude poor-quality data using QC
-5. run the age-group analysis on the clean final sample
-
-That keeps the workflow efficient, reproducible, and easy to justify in the dissertation methods section.
-
-## Why This Is Defensible
-
-- `fMRIPrep` gives you one standardized preprocessing pipeline for every participant instead of mixing legacy outputs across subjects.
-- The final sample is screened with both automated QC and manual report review rather than motion numbers alone.
-- The connectivity step uses a standard cortical atlas and nuisance-regression strategy, then censors high-motion volumes before correlation estimation.
-- The final models still control for mean FD so residual motion differences are explicitly accounted for statistically.
-
-## Core References
-
-- Esteban et al. (2019), `fMRIPrep: a robust preprocessing pipeline for functional MRI`, Nature Methods.
-- Behzadi et al. (2007), `a component based noise correction method (CompCor) for BOLD and perfusion based fMRI`.
-- Power et al. (2014), `Methods to detect, characterize, and remove motion artifact in resting state fMRI`.
-- Schaefer et al. (2018), `Local-Global Parcellation of the Human Cerebral Cortex from Intrinsic Functional Connectivity MRI`.
+- `d10985de220978834e485821a805b72c92c70521`

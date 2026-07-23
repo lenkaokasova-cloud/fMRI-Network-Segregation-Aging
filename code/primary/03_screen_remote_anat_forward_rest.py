@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 
+# What this script does:
+#   Checks remote OpenNeuro metadata and keeps only the subjects who have both
+#   structural anatomy and a forward resting-state run.
+# How to run it:
+#   Run from the repo root with:
+#   python code/primary/03_screen_remote_anat_forward_rest.py
+# Main outputs:
+#   Annotated younger and older remote-file tables plus the filtered
+#   remote_anat_forward TSV files in data/processed/screening/
+
 from __future__ import annotations
 
 import argparse
@@ -8,7 +18,7 @@ import subprocess
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 OPENNEURO_PYTHON = Path(
     "/Library/Frameworks/Python.framework/Versions/3.9/bin/python3"
 )
@@ -84,6 +94,8 @@ def write_rows(path: Path, fieldnames: list[str], rows: list[dict[str, object]])
 
 
 def query_single_subject(dataset: str, subject: str) -> dict[str, object]:
+    # I do the remote check subject-by-subject here so I can tell exactly what each person has
+    # before I download anything locally.
     code = f"""
 from tqdm.std import tqdm
 import openneuro._download as d
@@ -229,6 +241,7 @@ def annotate_rows(
 
 
 def filter_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    # This is the actual gate for the project: the subject needs anat plus the forward rest run.
     return [
         row
         for row in rows
@@ -248,6 +261,7 @@ def main() -> None:
     young_fieldnames, young_rows = load_rows(young_input)
     older_fieldnames, older_rows = load_rows(older_input)
     all_subjects = [row["participant_id"] for row in young_rows + older_rows]
+    # I query availability once up front so the younger and older tables are filtered consistently.
     availability = fetch_subject_availability(args.dataset, all_subjects)
 
     failed_subjects = [

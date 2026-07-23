@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 
+# What this script does:
+#   Splits the MRI-eligible participant table into the younger and older age
+#   groups used later in the project.
+# How to run it:
+#   Run from the repo root with:
+#   python code/primary/02_split_age_groups.py
+# Main outputs:
+#   data/processed/screening/ds005752_mri_participants_age_20_25.tsv
+#   data/processed/screening/ds005752_mri_participants_age_50_75.tsv
+
 from __future__ import annotations
 
 import argparse
@@ -7,7 +17,7 @@ import csv
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def parse_args() -> argparse.Namespace:
@@ -88,6 +98,7 @@ def main() -> None:
     young_rows: list[dict[str, str]] = []
     older_rows: list[dict[str, str]] = []
 
+    # This is where one MRI-only table gets turned into the two age bands I actually analyze.
     for row in rows:
         age = parse_age(row)
         if age is None:

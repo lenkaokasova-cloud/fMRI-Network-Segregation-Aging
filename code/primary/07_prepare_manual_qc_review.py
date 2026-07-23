@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 
+# What this script does:
+#   Creates or refreshes the TSV I use to manually review each fMRIPrep HTML
+#   report.
+# How to run it:
+#   Run from the repo root with:
+#   python code/primary/07_prepare_manual_qc_review.py
+# Main output:
+#   data/processed/qc/manual_fmriprep_report_review.tsv
+
 from __future__ import annotations
 
 import argparse
@@ -7,7 +16,7 @@ import csv
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = "data/processed/qc/manual_fmriprep_report_review.tsv"
 
 
@@ -76,6 +85,7 @@ def collect_subjects(inputs: list[str], derivatives_dir: Path) -> list[str]:
     if subjects:
         return sorted(subjects)
 
+    # If I do not give inputs, I just build the sheet from every local fMRIPrep report I have.
     for report_path in sorted(derivatives_dir.glob("sub-*.html")):
         add(report_path.stem)
     return subjects
@@ -109,7 +119,6 @@ def main() -> None:
         "t1w_to_mni_status",
         "forward_bold_mask_status",
         "susceptibility_artifact_status",
-        "reviewer",
         "review_date",
         "manual_qc_notes",
     ]
@@ -126,11 +135,11 @@ def main() -> None:
             "t1w_to_mni_status": "",
             "forward_bold_mask_status": "",
             "susceptibility_artifact_status": "",
-            "reviewer": "",
             "review_date": "",
             "manual_qc_notes": "",
         }
         existing = existing_rows.get(subject, {})
+        # I keep any older manual notes here so rerunning the template does not wipe my review work.
         for fieldname in fieldnames:
             existing_value = existing.get(fieldname, "").strip()
             if existing_value:

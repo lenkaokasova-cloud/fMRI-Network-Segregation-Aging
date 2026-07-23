@@ -3,6 +3,10 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# macOS / Windows noise
+.DS_Store
+Thumbs.db
+
 # C extensions
 *.so
 
@@ -237,6 +241,9 @@ participants.tsv
 phenotype/
 *.tsv
 *.csv
+
+# accidental nested local copy
+fMRI-Network-Segregation-Aging/
 
 # Logs and temporary files
 logs/

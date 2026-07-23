@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 
+# What this script does:
+#   Locks the fixed younger preprocessing subset used in this project so the
+#   workflow reproduces the same younger branch each time.
+# How to run it:
+#   Run from the repo root with:
+#   python code/primary/04_select_younger_preprocessing_subset.py
+# Main outputs:
+#   data/processed/screening/ds005752_mri_participants_age_20_25_preprocessing_primary.tsv
+#   data/processed/screening/ds005752_mri_participants_age_20_25_preprocessing_backup.tsv
+#   data/processed/screening/ds005752_mri_participants_age_20_25_preprocessing_plan.tsv
+
 from __future__ import annotations
 
 import argparse
@@ -10,11 +21,12 @@ from itertools import combinations
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass(frozen=True)
 class Candidate:
+    # This just stores the subject-level details I need when I balance the younger subset.
     row: dict[str, str]
     subject_id: str
     age: int
@@ -26,6 +38,7 @@ class Candidate:
 
 @dataclass(frozen=True)
 class Plan:
+    # A plan is one possible subset together with the counts I care about matching.
     candidates: tuple[Candidate, ...]
     female_count: int
     release_1_count: int
@@ -296,6 +309,7 @@ def select_subset(
     release_1_target: int,
     release_2_target: int,
 ) -> Plan | None:
+    # This dynamic-programming step finds a subset that hits the requested balance as closely as possible.
     empty_plan = make_plan(tuple())
     dp: dict[tuple[int, int, int], Plan] = {(0, 0, 0): empty_plan}
     age_choices = enumerate_age_choices(candidates, age_targets)
@@ -473,6 +487,7 @@ def main() -> None:
         if backup_plan is not None:
             backup_candidates = backup_plan.candidates
         else:
+            # If no exact balanced backup exists, I just keep the best remaining candidates as reserves.
             backup_candidates = tuple(sort_remaining_candidates(remaining_candidates)[: args.backup_size])
 
     backup_ids = {candidate.subject_id for candidate in backup_candidates}
