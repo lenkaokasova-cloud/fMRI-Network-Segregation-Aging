@@ -5,7 +5,7 @@
 #   main unbalanced branch against a matched alternative.
 # How to run it:
 #   Run from the repo root with:
-#   python code/sensitivity/22_make_balanced_tr3_sensitivity_sample.py
+#   python code/sensitivity/21_make_balanced_tr3_sensitivity_sample.py
 # Main outputs:
 #   Balanced sample TSV, pairing TSV, and summary markdown in
 #   data/processed/screening/

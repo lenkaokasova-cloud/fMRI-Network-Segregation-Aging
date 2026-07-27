@@ -5,7 +5,7 @@
 #   Schaefer/Yeo atlas sits sensibly on the normalized data.
 # How to run it:
 #   Run from the repo root with:
-#   python code/primary/10_check_atlas_overlay.py
+#   python code/primary/09_check_atlas_overlay.py
 # Main outputs:
 #   data/processed/qc/atlas_overlay/figures/
 #   data/processed/qc/atlas_overlay/atlas_overlay_summary.tsv

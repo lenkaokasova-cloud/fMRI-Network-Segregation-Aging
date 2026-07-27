@@ -5,7 +5,7 @@
 #   information to a participant TSV before full download.
 # How to run it:
 #   Run from the repo root with:
-#   python code/utilities/14_annotate_remote_tr.py
+#   python code/utilities/13_annotate_remote_tr.py
 # Main output:
 #   An annotated *_with_tr.tsv file next to the input screening TSV
 

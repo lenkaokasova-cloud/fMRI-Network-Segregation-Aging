@@ -5,7 +5,7 @@
 #   motion, censoring, and QC-FC patterns.
 # How to run it:
 #   Run from the repo root with:
-#   python code/utilities/16_build_qc_reporting.py
+#   python code/utilities/15_build_qc_reporting.py
 # Main output:
 #   data/processed/qc/reporting/
 
@@ -64,12 +64,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--denoising-summary",
         default="data/processed/denoising/metrics/subject_denoising_summary.tsv",
-        help="Denoising summary TSV produced by code/primary/11_run_denoising.py.",
+        help="Denoising summary TSV produced by code/primary/10_run_denoising.py.",
     )
     parser.add_argument(
         "--denoising-settings",
         default="data/processed/denoising/metrics/denoising_settings.tsv",
-        help="Denoising settings TSV produced by code/primary/11_run_denoising.py.",
+        help="Denoising settings TSV produced by code/primary/10_run_denoising.py.",
     )
     parser.add_argument(
         "--derivatives-dir",

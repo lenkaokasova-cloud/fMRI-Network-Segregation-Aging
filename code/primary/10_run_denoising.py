@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
 
 # What this script does:
-#   Runs the study-specific parcel-level denoising step, including censoring,
-#   nuisance regression, filtering, and time-series extraction.
+#   Runs the study-specific parcel-level denoising step for the final analysis
+#   sample.
+#   For each subject, it loads the preprocessed forward resting-state BOLD run,
+#   the matching confounds TSV, and the JSON metadata from fMRIPrep. It then
+#   applies the dissertation denoising pipeline: censoring non-steady-state and
+#   high-motion volumes, nuisance regression, temporal filtering, and Schaefer
+#   parcel time-series extraction in MNI space.
 # How to run it:
 #   Run from the repo root with:
-#   python code/primary/11_run_denoising.py
+#   python code/primary/10_run_denoising.py
 # Main outputs:
 #   data/processed/denoising/timeseries/
 #   data/processed/denoising/metrics/
+#   In practice, this writes one denoised parcel time-series file per subject
+#   in timeseries/, plus atlas_labels.tsv, subject_denoising_summary.tsv, and
+#   denoising_settings.tsv in metrics/.
 
 from __future__ import annotations
 

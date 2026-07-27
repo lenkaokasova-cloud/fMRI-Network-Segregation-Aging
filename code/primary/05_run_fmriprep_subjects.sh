@@ -3,10 +3,14 @@
 # What this script does:
 #   Runs fMRIPrep for the selected subjects and then updates the confounds-based
 #   QC summaries and the manual-review TSV.
+# Why this is a shell script:
+#   This step mainly launches Docker/fMRIPrep and manages paths, environment
+#   variables, and batch execution, so Bash is the simplest way to run the
+#   preprocessing workflow.
 # How to run it:
 #   Run from the repo root with:
 #   export FS_LICENSE=$HOME/license.txt
-#   bash code/primary/06_run_fmriprep_subjects.sh
+#   bash code/primary/05_run_fmriprep_subjects.sh
 # Main outputs:
 #   data/derivatives/fmriprep/
 #   data/logs/fmriprep/
@@ -19,9 +23,9 @@ set -euo pipefail
 #
 # Usage:
 #   export FS_LICENSE=$HOME/license.txt
-#   bash code/primary/06_run_fmriprep_subjects.sh
-#   bash code/primary/06_run_fmriprep_subjects.sh data/processed/screening/ds005752_mri_participants_age_50_75_remote_anat_forward.tsv
-#   bash code/primary/06_run_fmriprep_subjects.sh sub-ON01016 sub-ON39099
+#   bash code/primary/05_run_fmriprep_subjects.sh
+#   bash code/primary/05_run_fmriprep_subjects.sh data/processed/screening/ds005752_mri_participants_age_50_75_remote_anat_forward.tsv
+#   bash code/primary/05_run_fmriprep_subjects.sh sub-ON01016 sub-ON39099
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -40,16 +44,8 @@ FORCE_FMRIPREP="${FMRIPREP_FORCE:-0}"
 REQUIRE_FS_LICENSE="${FMRIPREP_REQUIRE_FS_LICENSE:-1}"
 CONTINUE_ON_ERROR="${FMRIPREP_CONTINUE_ON_ERROR:-1}"
 BATCH_STATUS_FILE="${QCDIR}/fmriprep_batch_status.tsv"
-YOUNG_SELECTED_INPUT="${REPO_ROOT}/data/processed/screening/ds005752_mri_participants_age_20_25_preprocessing_primary.tsv"
-YOUNG_FALLBACK_INPUT="${REPO_ROOT}/data/processed/screening/ds005752_mri_participants_age_20_25_remote_anat_forward.tsv"
+YOUNG_DEFAULT_INPUT="${REPO_ROOT}/data/processed/screening/ds005752_mri_participants_age_20_25_remote_anat_forward.tsv"
 OLDER_DEFAULT_INPUT="${REPO_ROOT}/data/processed/screening/ds005752_mri_participants_age_50_75_remote_anat_forward.tsv"
-
-if [[ -f "${YOUNG_SELECTED_INPUT}" ]]; then
-  # If I already chose the younger preprocessing subset, I want this script to follow that by default.
-  YOUNG_DEFAULT_INPUT="${YOUNG_SELECTED_INPUT}"
-else
-  YOUNG_DEFAULT_INPUT="${YOUNG_FALLBACK_INPUT}"
-fi
 
 DEFAULT_INPUTS=(
   "${YOUNG_DEFAULT_INPUT}"
@@ -231,7 +227,7 @@ run_fmriprep_subject() {
 
   printf 'Running QC summary for %s...\n' "${subject}"
   # I regenerate the QC summary right away so the screening tables stay in sync with the newest run.
-  python "${SCRIPT_DIR}/08_qc_from_confounds.py" --subject "${subject}"
+  python "${SCRIPT_DIR}/07_qc_from_confounds.py" --subject "${subject}"
   if ! contains_subject "${subject}" "${SKIPPED_SUBJECTS[@]:-}"; then
     record_status "${subject}" "completed" "${subject_log}"
     COMPLETED_SUBJECTS+=("${subject}")
@@ -292,7 +288,7 @@ for subject in "${SUBJECTS[@]}"; do
   fi
 done
 
-python "${SCRIPT_DIR}/07_prepare_manual_qc_review.py" "${SUBJECTS[@]}"
+python "${SCRIPT_DIR}/06_prepare_manual_qc_review.py" "${SUBJECTS[@]}"
 
 printf '\nFinished fMRIPrep and QC for %s requested subjects.\n' "${#SUBJECTS[@]}"
 printf 'Update data/processed/qc/manual_fmriprep_report_review.tsv after reviewing the HTML reports.\n'

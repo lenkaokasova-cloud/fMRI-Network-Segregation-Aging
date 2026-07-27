@@ -3,9 +3,13 @@
 # What this script does:
 #   Downloads the selected ds005752 subjects from OpenNeuro into the local raw
 #   BIDS folder.
+# Why this is a shell script:
+#   This step mainly runs command-line tools and handles file paths, subject
+#   lists, and local folders, so Bash is the simplest way to manage the
+#   download workflow.
 # How to run it:
 #   Run from the repo root with:
-#   bash code/primary/05_download_openneuro_subjects.sh
+#   bash code/primary/04_download_openneuro_subjects.sh
 # Main output:
 #   Subject folders inside data/raw/ds005752/
 
@@ -14,25 +18,17 @@ set -euo pipefail
 # Download selected ds005752 subjects with anat/, func/, and fmap/ if present.
 #
 # Usage:
-#   bash code/primary/05_download_openneuro_subjects.sh
-#   bash code/primary/05_download_openneuro_subjects.sh data/processed/screening/ds005752_mri_participants_age_20_25_remote_anat_forward.tsv
-#   bash code/primary/05_download_openneuro_subjects.sh sub-ON01016 sub-ON39099
+#   bash code/primary/04_download_openneuro_subjects.sh
+#   bash code/primary/04_download_openneuro_subjects.sh data/processed/screening/ds005752_mri_participants_age_20_25_remote_anat_forward.tsv
+#   bash code/primary/04_download_openneuro_subjects.sh sub-ON01016 sub-ON39099
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DATASET="ds005752"
 TARGET_DIR="${REPO_ROOT}/data/raw/${DATASET}"
 OPENNEURO_PYTHON="${OPENNEURO_PYTHON:-$(head -n 1 "$(command -v openneuro-py)" | sed 's/^#!//')}"
-YOUNG_SELECTED_INPUT="${REPO_ROOT}/data/processed/screening/ds005752_mri_participants_age_20_25_preprocessing_primary.tsv"
-YOUNG_FALLBACK_INPUT="${REPO_ROOT}/data/processed/screening/ds005752_mri_participants_age_20_25_remote_anat_forward.tsv"
+YOUNG_DEFAULT_INPUT="${REPO_ROOT}/data/processed/screening/ds005752_mri_participants_age_20_25_remote_anat_forward.tsv"
 OLDER_DEFAULT_INPUT="${REPO_ROOT}/data/processed/screening/ds005752_mri_participants_age_50_75_remote_anat_forward.tsv"
-
-if [[ -f "${YOUNG_SELECTED_INPUT}" ]]; then
-  # If I already fixed a younger preprocessing list, I want that to be the default download input.
-  YOUNG_DEFAULT_INPUT="${YOUNG_SELECTED_INPUT}"
-else
-  YOUNG_DEFAULT_INPUT="${YOUNG_FALLBACK_INPUT}"
-fi
 
 DEFAULT_INPUTS=(
   "${YOUNG_DEFAULT_INPUT}"

@@ -5,7 +5,7 @@
 #   report.
 # How to run it:
 #   Run from the repo root with:
-#   python code/primary/07_prepare_manual_qc_review.py
+#   python code/primary/06_prepare_manual_qc_review.py
 # Main output:
 #   data/processed/qc/manual_fmriprep_report_review.tsv
 

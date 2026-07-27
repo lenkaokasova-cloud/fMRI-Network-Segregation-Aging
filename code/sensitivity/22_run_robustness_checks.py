@@ -5,7 +5,7 @@
 #   motion subsets and metric-sensitivity analyses.
 # How to run it:
 #   Run from the repo root with:
-#   python code/sensitivity/23_run_robustness_checks.py
+#   python code/sensitivity/22_run_robustness_checks.py
 # Main output:
 #   data/processed/analysis/robustness/
 

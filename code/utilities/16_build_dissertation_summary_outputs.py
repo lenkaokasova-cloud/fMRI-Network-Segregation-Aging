@@ -5,7 +5,7 @@
 #   tables and figures that are easier to use in the dissertation.
 # How to run it:
 #   Run from the repo root with:
-#   python code/utilities/17_build_dissertation_summary_outputs.py
+#   python code/utilities/16_build_dissertation_summary_outputs.py
 # Main output:
 #   data/processed/analysis/dissertation_summary/
 

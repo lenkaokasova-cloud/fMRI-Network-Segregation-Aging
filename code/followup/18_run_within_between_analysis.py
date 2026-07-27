@@ -5,7 +5,7 @@
 #   whether age effects are coming from one, the other, or both.
 # How to run it:
 #   Run from the repo root with:
-#   python code/followup/19_run_within_between_analysis.py
+#   python code/followup/18_run_within_between_analysis.py
 # Main output:
 #   data/processed/analysis/within_between/
 

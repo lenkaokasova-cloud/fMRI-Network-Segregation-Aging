@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
 
 # What this script does:
-#   Runs the main age-group models for the final TR = 3 s sample and saves the
-#   primary figures, tables, and summaries.
+#   Runs the main age-group analysis for the final TR = 3 s sample.
+#   It combines the final sample TSV with the connectivity outputs
+#   subject_global_segregation.tsv and subject_network_segregation.tsv, then
+#   fits four main models:
+#   1. a global younger-vs-older model using global_segregation_prop
+#   2. a continuous-age model using global_segregation_prop
+#   3. a network-type model using segregation_prop for sensory/motor vs
+#      higher-order networks
+#   4. a network-specific model across the individual Yeo 7 networks
+#   In these models, sex and mean FD are included as covariates.
+#   The script also writes summary tables and dissertation-style figures.
 # How to run it:
 #   Run from the repo root with:
-#   python code/primary/13_run_age_group_analysis.py
+#   python code/primary/12_run_age_group_analysis.py
 # Main output:
 #   data/processed/analysis/
+#   This includes model_coefficients.tsv, sample_summary.tsv,
+#   subject_global_with_metadata.tsv, subject_network_with_metadata.tsv,
+#   subject_network_type_summary.tsv, analysis_summary.md, and the main
+#   age-group figures.
 
 from __future__ import annotations
 

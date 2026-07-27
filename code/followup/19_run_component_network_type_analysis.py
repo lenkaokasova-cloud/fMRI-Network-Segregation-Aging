@@ -5,7 +5,7 @@
 #   pattern differs across those broader network types.
 # How to run it:
 #   Run from the repo root with:
-#   python code/followup/20_run_component_network_type_analysis.py
+#   python code/followup/19_run_component_network_type_analysis.py
 # Main output:
 #   data/processed/analysis/network_type_components/
 

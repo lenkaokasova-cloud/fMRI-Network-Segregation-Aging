@@ -5,7 +5,7 @@
 #   QC summary with motion and retained-data measures.
 # How to run it:
 #   Run from the repo root with:
-#   python code/primary/08_qc_from_confounds.py --subject sub-ON01016
+#   python code/primary/07_qc_from_confounds.py --subject sub-ON01016
 # Main output:
 #   data/processed/qc/sub-*_qc_summary.tsv
 

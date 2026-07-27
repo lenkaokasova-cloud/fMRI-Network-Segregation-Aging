@@ -5,7 +5,7 @@
 #   decide which subjects pass into the QC-pass sample.
 # How to run it:
 #   Run from the repo root with:
-#   python code/primary/09_build_clean_sample.py
+#   python code/primary/08_build_clean_sample.py
 # Main outputs:
 #   data/processed/screening/ds005752_qc_pass_sample.tsv
 #   data/processed/screening/ds005752_qc_pass_sample_decisions.tsv
@@ -94,7 +94,7 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_MANUAL_QC,
         help=(
             "Manual fMRIPrep report-review TSV produced by "
-            "code/primary/07_prepare_manual_qc_review.py."
+            "code/primary/06_prepare_manual_qc_review.py."
         ),
     )
     parser.add_argument(
@@ -186,7 +186,7 @@ def main() -> None:
 
     if args.require_manual_qc and not manual_qc_path.exists():
         raise FileNotFoundError(
-            "Manual QC review file is missing. Run code/primary/07_prepare_manual_qc_review.py "
+            "Manual QC review file is missing. Run code/primary/06_prepare_manual_qc_review.py "
             "and complete the TSV after checking each fMRIPrep HTML report."
         )
 
@@ -267,7 +267,7 @@ def main() -> None:
                 decision = "exclude"
                 reason = (
                     "QC summary predates the current pipeline. Rerun "
-                    "code/primary/08_qc_from_confounds.py for this subject."
+                    "code/primary/07_qc_from_confounds.py for this subject."
                 )
             else:
                 n_volumes = int(qc_row["n_volumes"])

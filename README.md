@@ -16,22 +16,26 @@ If someone wants the shortest reproducible main path, the core commands are:
 python code/primary/01_filter_mri_participants.py
 python code/primary/02_split_age_groups.py
 python code/primary/03_screen_remote_anat_forward_rest.py
-python code/primary/04_select_younger_preprocessing_subset.py
-bash code/primary/05_download_openneuro_subjects.sh
+bash code/primary/04_download_openneuro_subjects.sh
 export FS_LICENSE=$HOME/license.txt
-bash code/primary/06_run_fmriprep_subjects.sh
-python code/primary/09_build_clean_sample.py
-python code/primary/10_check_atlas_overlay.py
-python code/primary/11_run_denoising.py
-python code/primary/12_run_connectivity_analysis.py
-python code/primary/13_run_age_group_analysis.py
+bash code/primary/05_run_fmriprep_subjects.sh
+python code/primary/08_build_clean_sample.py
+python code/primary/09_check_atlas_overlay.py
+python code/primary/10_run_denoising.py
+python code/primary/11_run_connectivity_analysis.py
+python code/primary/12_run_age_group_analysis.py
 ```
+
+The numbering jumps from `05` to `08` here on purpose.
+`code/primary/06_prepare_manual_qc_review.py` and `code/primary/07_qc_from_confounds.py`
+are usually run automatically inside `code/primary/05_run_fmriprep_subjects.sh`, so
+they do not normally need to be called separately in the shortest workflow.
 
 Main follow-up inference:
 
 ```bash
-python code/followup/21_run_permutation_fdr_analysis.py
-python code/followup/18_run_normative_analysis.py
+python code/followup/20_run_permutation_fdr_analysis.py
+python code/followup/17_run_normative_analysis.py
 ```
 
 ## Main Idea
@@ -41,15 +45,14 @@ The primary branch of the project is:
 1. keep only `MRI = 1` participants
 2. split into younger and older age groups
 3. check remote metadata for `anat` plus forward resting-state `func`
-4. lock the younger preprocessing subset used in this project
-5. download those subjects
-6. run `fMRIPrep`
-7. apply automated QC plus manual report review
-8. build the final `TR = 3 s` analysis sample
-9. check atlas alignment
-10. denoise parcel time series
-11. build connectivity and segregation metrics
-12. run the main age-group analysis
+4. download the screened younger and older subjects
+5. run `fMRIPrep`
+6. prepare the manual QC sheet and derive the automated confounds-based QC summaries
+7. review the reports and build the final `TR = 3 s` analysis sample
+8. check atlas alignment
+9. denoise parcel time series
+10. build connectivity and segregation metrics
+11. run the main age-group analysis
 
 ## Environment
 
@@ -77,9 +80,6 @@ The `code/` folder is now split by purpose.
 - `code/exploratory/`
   Exploratory extensions such as PCA anomaly scoring and classification.
 
-- `code/archive/`
-  Older or diagnostic scripts kept for provenance, not needed for the main branch.
-
 ## Main Workflow
 
 Run these from the repo root:
@@ -88,25 +88,28 @@ Run these from the repo root:
 python code/primary/01_filter_mri_participants.py
 python code/primary/02_split_age_groups.py
 python code/primary/03_screen_remote_anat_forward_rest.py
-python code/primary/04_select_younger_preprocessing_subset.py
-bash code/primary/05_download_openneuro_subjects.sh
+bash code/primary/04_download_openneuro_subjects.sh
 export FS_LICENSE=$HOME/license.txt
-bash code/primary/06_run_fmriprep_subjects.sh
-python code/primary/09_build_clean_sample.py
-python code/primary/10_check_atlas_overlay.py
-python code/primary/11_run_denoising.py
-python code/primary/12_run_connectivity_analysis.py
-python code/primary/13_run_age_group_analysis.py
+bash code/primary/05_run_fmriprep_subjects.sh
+python code/primary/08_build_clean_sample.py
+python code/primary/09_check_atlas_overlay.py
+python code/primary/10_run_denoising.py
+python code/primary/11_run_connectivity_analysis.py
+python code/primary/12_run_age_group_analysis.py
 ```
+
+Again, the jump from `05` to `08` is expected in the short run list because
+`05_run_fmriprep_subjects.sh` normally triggers `06_prepare_manual_qc_review.py`
+and `07_qc_from_confounds.py` for me.
 
 These are the main QC and inference follow-ups I would normally run after that:
 
 ```bash
-python code/followup/21_run_permutation_fdr_analysis.py
-python code/followup/18_run_normative_analysis.py
+python code/followup/20_run_permutation_fdr_analysis.py
+python code/followup/17_run_normative_analysis.py
 ```
 
-`code/primary/08_qc_from_confounds.py` and `code/primary/07_prepare_manual_qc_review.py` are normally called inside `code/primary/06_run_fmriprep_subjects.sh`, so I do not usually need to run them separately.
+`code/primary/07_qc_from_confounds.py` and `code/primary/06_prepare_manual_qc_review.py` are normally called inside `code/primary/05_run_fmriprep_subjects.sh`, so I do not usually need to run them separately.
 
 ## Primary Sample
 
@@ -127,76 +130,74 @@ That is the sample that should be treated as primary in the write-up.
 - `code/primary/03_screen_remote_anat_forward_rest.py`
   Checks remote OpenNeuro metadata and keeps only subjects with `anat` and a forward resting-state run.
 
-- `code/primary/04_select_younger_preprocessing_subset.py`
-  Locks the younger preprocessing subset used in this project so the workflow reproduces the same branch.
+- `code/primary/04_download_openneuro_subjects.sh`
+  Downloads the screened younger and older subjects from OpenNeuro.
 
-- `code/primary/05_download_openneuro_subjects.sh`
-  Downloads the selected subjects from OpenNeuro.
-
-- `code/primary/06_run_fmriprep_subjects.sh`
+- `code/primary/05_run_fmriprep_subjects.sh`
   Runs `fMRIPrep`, writes logs, creates confounds-based QC summaries, and updates the manual-review TSV.
 
-- `code/primary/09_build_clean_sample.py`
+- `code/primary/08_build_clean_sample.py`
   Applies the QC rules and builds the QC-pass sample.
 
-- `code/primary/10_check_atlas_overlay.py`
+- `code/primary/09_check_atlas_overlay.py`
   Checks whether the Schaefer/Yeo atlas sits sensibly on the normalized anatomy.
 
-- `code/primary/11_run_denoising.py`
+- `code/primary/10_run_denoising.py`
   Runs the parcel-level denoising workflow and saves denoised time series.
 
-- `code/primary/12_run_connectivity_analysis.py`
+- `code/primary/11_run_connectivity_analysis.py`
   Builds the parcel connectivity matrices and the network/global segregation metrics.
 
-- `code/primary/13_run_age_group_analysis.py`
+- `code/primary/12_run_age_group_analysis.py`
   Runs the main age-group regression models and writes the primary analysis outputs.
 
 ## Utilities
 
-- `code/utilities/14_annotate_remote_tr.py`
+- `code/utilities/13_annotate_remote_tr.py`
   Annotates remote candidate tables with `TR` before full download.
 
-- `code/utilities/15_check_denoised_timeseries.py`
+- `code/utilities/14_check_denoised_timeseries.py`
   Quick visual check of denoised parcel time series.
 
-- `code/utilities/16_build_qc_reporting.py`
+- `code/utilities/15_build_qc_reporting.py`
   Builds the extra QC reporting figures and summary tables.
 
-- `code/utilities/17_build_dissertation_summary_outputs.py`
+- `code/utilities/16_build_dissertation_summary_outputs.py`
   Builds cleaned dissertation tables and summary figures from the analysis outputs.
 
 ## Follow-Up Analyses
 
-- `code/followup/21_run_permutation_fdr_analysis.py`
+- `code/followup/20_run_permutation_fdr_analysis.py`
   Adds the stricter permutation and FDR-based inferential layer.
 
-- `code/followup/18_run_normative_analysis.py`
+- `code/followup/17_run_normative_analysis.py`
   Scores older participants relative to the younger reference distribution.
 
-- `code/followup/19_run_within_between_analysis.py`
+- `code/followup/18_run_within_between_analysis.py`
   Splits segregation into within-network and between-network components.
 
-- `code/followup/20_run_component_network_type_analysis.py`
+- `code/followup/19_run_component_network_type_analysis.py`
   Compares sensory/motor and higher-order network components.
 
 ## Sensitivity Analyses
 
-- `code/sensitivity/22_make_balanced_tr3_sensitivity_sample.py`
+- `code/sensitivity/21_make_balanced_tr3_sensitivity_sample.py`
   Builds the balanced `11 x 11` TR = 3 s sensitivity sample.
 
-- `code/sensitivity/23_run_robustness_checks.py`
+- `code/sensitivity/22_run_robustness_checks.py`
   Runs robustness branches such as GSR, partial correlation, or related alternatives.
 
-- `code/sensitivity/24_compare_sensitivity_branches.py`
+- `code/sensitivity/23_compare_sensitivity_branches.py`
   Compares the main branch against the sensitivity branches.
 
 ## Exploratory Analyses
 
-- `code/exploratory/25_run_pca_anomaly_analysis.py`
+- `code/exploratory/24_run_pca_anomaly_analysis.py`
   PCA-based anomaly/deviation scoring.
 
-- `code/exploratory/26_run_classification_analysis.py`
+- `code/exploratory/25_run_classification_analysis.py`
   Small exploratory classification branch.
+
 
 ## Main Output Folders
 

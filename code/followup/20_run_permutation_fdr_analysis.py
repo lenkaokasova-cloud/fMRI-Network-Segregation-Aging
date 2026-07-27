@@ -5,7 +5,7 @@
 #   main age-group analysis results.
 # How to run it:
 #   Run from the repo root with:
-#   python code/followup/21_run_permutation_fdr_analysis.py
+#   python code/followup/20_run_permutation_fdr_analysis.py
 # Main output:
 #   data/processed/analysis/permutation_inference/
 

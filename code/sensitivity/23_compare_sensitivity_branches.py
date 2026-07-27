@@ -5,7 +5,7 @@
 #   whether the direction or strength of the results changes much.
 # How to run it:
 #   Run from the repo root with:
-#   python code/sensitivity/24_compare_sensitivity_branches.py
+#   python code/sensitivity/23_compare_sensitivity_branches.py
 # Main output:
 #   data/processed/analysis/literature_sensitivity/
 

@@ -5,7 +5,7 @@
 #   whether the saved time series look sensible before connectivity analysis.
 # How to run it:
 #   Run from the repo root with:
-#   python code/utilities/15_check_denoised_timeseries.py
+#   python code/utilities/14_check_denoised_timeseries.py
 # Main outputs:
 #   data/processed/denoising/qc/
 #   including subject figures and a timeseries QC summary TSV
@@ -57,7 +57,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--summary",
         default="data/processed/denoising/metrics/subject_denoising_summary.tsv",
-        help="Denoising summary TSV produced by code/primary/11_run_denoising.py.",
+        help="Denoising summary TSV produced by code/primary/10_run_denoising.py.",
     )
     parser.add_argument(
         "--output-dir",

@@ -5,7 +5,7 @@
 #   pattern and scoring subjects by how unusual they are relative to it.
 # How to run it:
 #   Run from the repo root with:
-#   python code/exploratory/25_run_pca_anomaly_analysis.py
+#   python code/exploratory/24_run_pca_anomaly_analysis.py
 # Main output:
 #   data/processed/analysis/pca_anomaly/
 
@@ -77,7 +77,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--connectivity-dir",
         default="data/processed/connectivity/metrics",
-        help="Directory containing connectivity outputs from code/primary/12_run_connectivity_analysis.py.",
+        help="Directory containing connectivity outputs from code/primary/11_run_connectivity_analysis.py.",
     )
     parser.add_argument(
         "--output-dir",

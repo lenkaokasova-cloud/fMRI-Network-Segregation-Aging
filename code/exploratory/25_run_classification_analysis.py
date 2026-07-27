@@ -5,7 +5,7 @@
 #   segregation features.
 # How to run it:
 #   Run from the repo root with:
-#   python code/exploratory/26_run_classification_analysis.py
+#   python code/exploratory/25_run_classification_analysis.py
 # Main output:
 #   data/processed/analysis/classification/
 
@@ -100,7 +100,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--connectivity-dir",
         default="data/processed/connectivity/metrics",
-        help="Directory containing connectivity outputs from code/primary/12_run_connectivity_analysis.py.",
+        help="Directory containing connectivity outputs from code/primary/11_run_connectivity_analysis.py.",
     )
     parser.add_argument(
         "--output-dir",

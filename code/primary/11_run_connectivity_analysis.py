@@ -2,13 +2,21 @@
 
 # What this script does:
 #   Turns the denoised parcel time series into subject-level connectivity
-#   matrices and network/global segregation measures.
+#   matrices and the main segregation metrics used in the dissertation.
+#   It loads each subject's denoised Schaefer parcel time series, estimates a
+#   parcel-by-parcel connectivity matrix, applies Fisher z transformation, and
+#   then calculates network-level and global segregation measures from the Yeo 7
+#   network labels attached to the atlas parcels.
 # How to run it:
 #   Run from the repo root with:
-#   python code/primary/12_run_connectivity_analysis.py
+#   python code/primary/11_run_connectivity_analysis.py
 # Main outputs:
 #   data/processed/connectivity/matrices/
 #   data/processed/connectivity/metrics/
+#   In practice, this writes one Fisher-z connectivity matrix per subject,
+#   a group mean matrix, and the main summary tables:
+#   subject_global_segregation.tsv, subject_network_segregation.tsv,
+#   atlas_labels.tsv, and connectivity_settings.tsv.
 
 from __future__ import annotations
 
@@ -39,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--denoising-dir",
         default="data/processed/denoising",
-        help="Directory produced by code/primary/11_run_denoising.py.",
+        help="Directory produced by code/primary/10_run_denoising.py.",
     )
     parser.add_argument(
         "--output-dir",
