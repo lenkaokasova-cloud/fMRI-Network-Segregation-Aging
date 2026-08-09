@@ -28,23 +28,45 @@ from scipy import stats
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 FIG_DPI = 300
-TITLE_SIZE = 15
-LABEL_SIZE = 12
+TITLE_SIZE = 14
+LABEL_SIZE = 11
 TICK_SIZE = 10
-GRID_COLOR = "#B8BDC7"
-YOUNG_COLOR = "#4C78A8"
-OLDER_COLOR = "#D16A3A"
-REFERENCE_LINE_COLOR = "#1F3A5F"
+TEXT_COLOR = "#253547"
+GRID_COLOR = "#D7DCE4"
+YOUNG_COLOR = "#4F739C"
+OLDER_COLOR = "#B87053"
+REFERENCE_LINE_COLOR = "#253547"
+FONT_FAMILY = "serif"
+FONT_SERIF = [
+    "Times New Roman",
+    "Times",
+    "Nimbus Roman",
+    "TeX Gyre Termes",
+    "STIX Two Text",
+    "Liberation Serif",
+    "DejaVu Serif",
+]
+MIN_RETAINED_MINUTES_REFERENCE = 9.0
 NETWORK_ORDER = ["Vis", "SomMot", "DorsAttn", "SalVentAttn", "Limbic", "Cont", "Default"]
 
 plt.rcParams.update(
     {
+        "font.family": FONT_FAMILY,
+        "font.serif": FONT_SERIF,
         "font.size": TICK_SIZE,
         "axes.titlesize": TITLE_SIZE,
         "axes.labelsize": LABEL_SIZE,
         "xtick.labelsize": TICK_SIZE,
         "ytick.labelsize": TICK_SIZE,
         "figure.titlesize": TITLE_SIZE,
+        "axes.titleweight": "semibold",
+        "axes.labelcolor": TEXT_COLOR,
+        "axes.edgecolor": TEXT_COLOR,
+        "axes.linewidth": 0.9,
+        "text.color": TEXT_COLOR,
+        "xtick.color": TEXT_COLOR,
+        "ytick.color": TEXT_COLOR,
+        "mathtext.fontset": "stix",
     }
 )
 
@@ -126,6 +148,11 @@ def style_axis(
         ax.set_ylabel(ylabel)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color(TEXT_COLOR)
+    ax.spines["bottom"].set_color(TEXT_COLOR)
+    ax.spines["left"].set_linewidth(0.9)
+    ax.spines["bottom"].set_linewidth(0.9)
+    ax.tick_params(length=4.2, width=0.8, color=TEXT_COLOR)
 
 
 def save_figure(fig: plt.Figure, outpath: Path) -> None:
@@ -193,14 +220,14 @@ def draw_flow_box(ax: plt.Axes, x: float, y: float, width: float, height: float,
         width,
         height,
         boxstyle="round,pad=0.02,rounding_size=0.02",
-        linewidth=1.5,
+        linewidth=1.6,
         edgecolor=color,
         facecolor=color,
-        alpha=0.16,
+        alpha=0.18,
     )
     ax.add_patch(patch)
-    ax.text(x + width / 2, y + height * 0.68, title, ha="center", va="center", fontsize=11, weight="bold")
-    ax.text(x + width / 2, y + height * 0.34, text, ha="center", va="center", fontsize=10)
+    ax.text(x + width / 2, y + height * 0.68, title, ha="center", va="center", fontsize=11.6, weight="semibold")
+    ax.text(x + width / 2, y + height * 0.34, text, ha="center", va="center", fontsize=10.8)
 
 
 def plot_sample_flow(screening_dir: Path, outpath: Path) -> None:
@@ -222,9 +249,9 @@ def plot_sample_flow(screening_dir: Path, outpath: Path) -> None:
         "older_final": int((final_sample["age_group"] == "older").sum()),
     }
 
-    fig, ax = plt.subplots(figsize=(10.5, 6.2))
+    fig, ax = plt.subplots(figsize=(11.1, 6.5))
     ax.axis("off")
-    ax.set_title("Primary Sample Flow", pad=16)
+    ax.set_title("Sample selection flow", pad=16, fontsize=16)
 
     y_positions = [0.78, 0.54, 0.30, 0.06]
     left_x = 0.10
@@ -251,8 +278,8 @@ def plot_sample_flow(screening_dir: Path, outpath: Path) -> None:
                     arrowprops={"arrowstyle": "->", "linewidth": 1.4, "color": REFERENCE_LINE_COLOR},
                 )
 
-    ax.text(left_x + width / 2, 0.97, "Younger branch", ha="center", va="center", fontsize=12, weight="bold", color=YOUNG_COLOR)
-    ax.text(right_x + width / 2, 0.97, "Older branch", ha="center", va="center", fontsize=12, weight="bold", color=OLDER_COLOR)
+    ax.text(left_x + width / 2, 0.97, "Younger branch", ha="center", va="center", fontsize=12.8, weight="semibold", color=YOUNG_COLOR)
+    ax.text(right_x + width / 2, 0.97, "Older branch", ha="center", va="center", fontsize=12.8, weight="semibold", color=OLDER_COLOR)
     save_figure(fig, outpath)
 
 
@@ -268,7 +295,12 @@ def plot_retained_minutes(denoising_summary: pd.DataFrame, outpath: Path) -> Non
             label=age_group,
             edgecolor="white",
         )
-    ax.axvline(7.5, color=REFERENCE_LINE_COLOR, linestyle="--", linewidth=1.6)
+    ax.axvline(
+        MIN_RETAINED_MINUTES_REFERENCE,
+        color=REFERENCE_LINE_COLOR,
+        linestyle="--",
+        linewidth=1.6,
+    )
     style_axis(
         ax,
         title="Retained Data Duration After Censoring",

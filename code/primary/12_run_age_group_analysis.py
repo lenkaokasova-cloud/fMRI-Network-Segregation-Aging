@@ -4,12 +4,11 @@
 #   Runs the main age-group analysis for the final TR = 3 s sample.
 #   It combines the final sample TSV with the connectivity outputs
 #   subject_global_segregation.tsv and subject_network_segregation.tsv, then
-#   fits four main models:
+#   fits three main models:
 #   1. a global younger-vs-older model using global_segregation_prop
-#   2. a continuous-age model using global_segregation_prop
-#   3. a network-type model using segregation_prop for sensory/motor vs
+#   2. a network-type model using segregation_prop for sensory/motor vs
 #      higher-order networks
-#   4. a network-specific model across the individual Yeo 7 networks
+#   3. a network-specific model across the individual Yeo 7 networks
 #   In these models, sex and mean FD are included as covariates.
 #   The script also writes summary tables and dissertation-style figures.
 # How to run it:
@@ -26,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
 os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve()))
@@ -37,28 +37,36 @@ import statsmodels.formula.api as smf
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from dissertation_figure_style import (
+    FIG_DPI,
+    GRID_COLOR,
+    MUTED_REFERENCE_LINE_COLOR,
+    OLDER_COLOR,
+    SUMMARY_AXIS_LABEL_SIZE,
+    SUMMARY_TICK_LABEL_SIZE,
+    SUMMARY_TITLE_SIZE,
+    YOUNG_COLOR,
+    apply_dissertation_rcparams,
+    darken_axis_text,
+    save_figure as save_dissertation_figure,
+    style_spines,
+)
+
 HIGHER_ORDER = {"Default", "Cont", "DorsAttn", "SalVentAttn"}
 SENSORY_MOTOR = {"Vis", "SomMot"}
-YOUNG_COLOR = "#4C78A8"
-OLDER_COLOR = "#D16A3A"
-GRID_COLOR = "#B8BDC7"
-REFERENCE_LINE_COLOR = "#1F3A5F"
-FIG_DPI = 300
 TITLE_SIZE = 15
 LABEL_SIZE = 12
 TICK_SIZE = 11
 LEGEND_SIZE = 11
 
-plt.rcParams.update(
-    {
-        "font.size": TICK_SIZE,
-        "axes.titlesize": TITLE_SIZE,
-        "axes.labelsize": LABEL_SIZE,
-        "xtick.labelsize": TICK_SIZE,
-        "ytick.labelsize": TICK_SIZE,
-        "legend.fontsize": LEGEND_SIZE,
-        "figure.titlesize": TITLE_SIZE,
-    }
+apply_dissertation_rcparams(
+    title_size=TITLE_SIZE,
+    label_size=LABEL_SIZE,
+    tick_size=TICK_SIZE,
+    legend_size=LEGEND_SIZE,
 )
 
 
@@ -158,18 +166,21 @@ def style_axis(
         ax.set_xlabel(xlabel)
     if ylabel:
         ax.set_ylabel(ylabel)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
+    style_spines(ax)
+    darken_axis_text(ax)
+    ax.xaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    ax.yaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    ax.title.set_fontsize(SUMMARY_TITLE_SIZE)
+    ax.title.set_fontweight("bold")
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontsize(SUMMARY_TICK_LABEL_SIZE)
     ax.tick_params(axis="x", labelrotation=xrotation)
     for label in ax.get_xticklabels():
         label.set_ha("right" if xrotation else "center")
 
 
 def save_figure(fig: plt.Figure, outpath: Path) -> None:
-    outpath.parent.mkdir(parents=True, exist_ok=True)
-    fig.tight_layout()
-    fig.savefig(outpath, dpi=FIG_DPI, bbox_inches="tight", facecolor="white")
-    plt.close(fig)
+    save_dissertation_figure(fig, outpath, dpi=FIG_DPI)
 
 
 def group_offsets(n_points: int, width: float = 0.12) -> np.ndarray:
@@ -178,40 +189,6 @@ def group_offsets(n_points: int, width: float = 0.12) -> np.ndarray:
     if n_points <= 1:
         return np.array([0.0])
     return np.linspace(-width, width, n_points)
-
-
-def plot_age_vs_global(df: pd.DataFrame, outpath: Path) -> None:
-    colors = {"young": YOUNG_COLOR, "older": OLDER_COLOR}
-    fig, ax = plt.subplots(figsize=(7.2, 4.8))
-    for age_group, color in colors.items():
-        subset = df[df["age_group"] == age_group].copy()
-        if subset.empty:
-            continue
-        ax.scatter(
-            subset["age"],
-            subset["global_segregation_prop"],
-            color=color,
-            s=80,
-            alpha=0.92,
-            edgecolors="white",
-            linewidths=0.6,
-            label=age_group,
-            zorder=3,
-        )
-        if len(subset) >= 2:
-            slope, intercept = np.polyfit(subset["age"], subset["global_segregation_prop"], 1)
-            x_values = np.linspace(subset["age"].min(), subset["age"].max(), 100)
-            ax.plot(x_values, slope * x_values + intercept, color=color, linewidth=1.8, alpha=0.9)
-
-    style_axis(
-        ax,
-        title="Age and Global Segregation",
-        xlabel="Age (years)",
-        ylabel="Global segregation",
-    )
-    ax.grid(color=GRID_COLOR, alpha=0.28, linewidth=0.9)
-    ax.legend(frameon=False, loc="upper left", bbox_to_anchor=(1.01, 1.0), borderaxespad=0.0)
-    save_figure(fig, outpath)
 
 
 def plot_global_by_group(df: pd.DataFrame, outpath: Path) -> None:
@@ -382,7 +359,7 @@ def plot_network_type_summary(df: pd.DataFrame, outpath: Path) -> None:
     ax.set_xticks([positions[key] for key in order])
     ax.set_xticklabels(labels)
     ax.grid(axis="y", color=GRID_COLOR, alpha=0.28, linewidth=0.9)
-    ax.axvline(2.0, color=REFERENCE_LINE_COLOR, alpha=0.18, linewidth=1.2)
+    ax.axvline(2.0, color=MUTED_REFERENCE_LINE_COLOR, alpha=0.18, linewidth=1.2)
     save_figure(fig, outpath)
 
 
@@ -481,10 +458,6 @@ def main() -> None:
         "global_segregation_prop ~ C(age_group, Treatment(reference='young')) + C(sex) + mean_fd",
         data=global_df,
     ).fit(cov_type="HC3")
-    continuous_age_model = smf.ols(
-        "global_segregation_prop ~ age + C(sex) + mean_fd",
-        data=global_df,
-    ).fit(cov_type="HC3")
     network_type_model = smf.ols(
         "segregation_prop ~ C(age_group, Treatment(reference='young')) * C(network_type, Treatment(reference='sensory_motor')) + C(sex) + mean_fd",
         data=network_type_df,
@@ -495,7 +468,6 @@ def main() -> None:
     ).fit(cov_type="cluster", cov_kwds={"groups": network_df["subject_id"]})
 
     global_table = model_to_table(global_model, "global_group_model")
-    continuous_age_table = model_to_table(continuous_age_model, "global_continuous_age_model")
     network_type_table = model_to_table(network_type_model, "network_type_model")
     network_specific_table = model_to_table(network_specific_model, "network_specific_model")
 
@@ -504,11 +476,10 @@ def main() -> None:
     network_df.to_csv(output_dir / "subject_network_with_metadata.tsv", sep="\t", index=False)
     network_type_df.to_csv(output_dir / "subject_network_type_summary.tsv", sep="\t", index=False)
     pd.concat(
-        [global_table, continuous_age_table, network_type_table, network_specific_table],
+        [global_table, network_type_table, network_specific_table],
         ignore_index=True,
     ).to_csv(output_dir / "model_coefficients.tsv", sep="\t", index=False)
 
-    plot_age_vs_global(global_df, figures_dir / "age_vs_global_segregation.png")
     plot_global_by_group(global_df, figures_dir / "global_segregation_by_group.png")
     plot_motion_vs_global(global_df, figures_dir / "motion_vs_global_segregation.png")
     plot_network_type_summary(network_type_df, figures_dir / "network_type_by_group.png")

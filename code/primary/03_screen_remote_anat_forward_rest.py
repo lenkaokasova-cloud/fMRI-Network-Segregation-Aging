@@ -14,14 +14,13 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import subprocess
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-OPENNEURO_PYTHON = Path(
-    "/Library/Frameworks/Python.framework/Versions/3.9/bin/python3"
-)
+OPENNEURO_PYTHON = os.environ.get("OPENNEURO_PYTHON", "python3")
 
 
 def parse_args() -> argparse.Namespace:
@@ -94,8 +93,6 @@ def write_rows(path: Path, fieldnames: list[str], rows: list[dict[str, object]])
 
 
 def query_single_subject(dataset: str, subject: str) -> dict[str, object]:
-    # I do the remote check subject-by-subject here so I can tell exactly what each person has
-    # before I download anything locally.
     code = f"""
 from tqdm.std import tqdm
 import openneuro._download as d
@@ -110,142 +107,64 @@ subject_ids = {{
     if item.get("directory")
 }}
 
-info = {{
-    "subject": "{subject}",
-    "has_anat": 0,
-    "has_rest_bold": 0,
-    "has_rest_forward": 0,
-    "has_rest_reverse": 0,
-    "has_fmap": 0,
-    "rest_bold_files": 0,
-}}
-subject_id = subject_ids.get("{subject}")
-if subject_id:
-    meta = d._get_download_metadata(
-        dataset_id=dataset,
-        tag=tag,
-        tree=f'"{{subject_id}}"',
-        max_retries=5,
-        check_snapshot=False,
-    )
-    for file in d._iterate_filenames(
-        meta["files"],
-        dataset_id=dataset,
-        tag=tag,
-        max_retries=5,
-        include=[],
-    ):
-        filename = file["filename"]
-        if (
-            filename.endswith(".nii.gz")
-            and (filename.startswith("anat/") or "/anat/" in filename)
-        ):
-            info["has_anat"] = 1
-        if filename.startswith("fmap/") or "/fmap/" in filename:
-            info["has_fmap"] = 1
-        if (
-            (filename.startswith("func/") or "/func/" in filename)
-            and "task-rest" in filename
-            and filename.endswith("_bold.nii.gz")
-        ):
-            info["has_rest_bold"] = 1
-            info["rest_bold_files"] += 1
-            if "dir-forward" in filename:
-                info["has_rest_forward"] = 1
-            if "dir-reverse" in filename:
-                info["has_rest_reverse"] = 1
-print(
-    "\\t".join(
-        str(info[key]) for key in (
-            "subject",
-            "has_anat",
-            "has_rest_bold",
-            "has_rest_forward",
-            "has_rest_reverse",
-            "has_fmap",
-            "rest_bold_files",
-        )
-    )
+subject_id = subject_ids["{subject}"]
+meta = d._get_download_metadata(
+    dataset_id=dataset,
+    tag=tag,
+    tree=f'"{{subject_id}}"',
+    max_retries=5,
+    check_snapshot=False,
 )
+
+files = set()
+stack = list(meta.get("files", []))
+while stack:
+    item = stack.pop()
+    if item.get("directory"):
+        stack.extend(item.get("files", []))
+    else:
+        files.add(item.get("filename", ""))
+
+has_anat = any("/anat/" in file for file in files)
+forward_rest_files = [file for file in files if "/func/" in file and "task-rest" in file and "dir-forward" in file]
+print(int(has_anat))
+print(int(bool(forward_rest_files)))
+print(len(forward_rest_files))
 """
-    proc = subprocess.run(
+    completed = subprocess.run(
         [str(OPENNEURO_PYTHON), "-c", code],
         capture_output=True,
         text=True,
-        check=False,
+        check=True,
     )
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or "Metadata query failed")
-    for line in proc.stdout.splitlines():
-        if not line or line.startswith(("👋", "👉", "🌍", "📁", "🍪")):
-            continue
-        (
-            _subject,
-            has_anat,
-            has_rest_bold,
-            has_rest_forward,
-            has_rest_reverse,
-            has_fmap,
-            rest_bold_files,
-        ) = line.split("\t")
-        return {
-            "has_anat": int(has_anat),
-            "has_rest_bold": int(has_rest_bold),
-            "has_rest_forward": int(has_rest_forward),
-            "has_rest_reverse": int(has_rest_reverse),
-            "has_fmap": int(has_fmap),
-            "rest_bold_files": int(rest_bold_files),
-            "query_failed": 0,
-            "query_error": "",
-        }
-    raise RuntimeError(f"No metadata row parsed for {subject}")
+    lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
+    return {
+        "has_remote_anat": int(lines[0]),
+        "has_remote_forward_rest": int(lines[1]),
+        "n_remote_forward_rest_files": int(lines[2]),
+    }
 
 
-def fetch_subject_availability(
-    dataset: str, subjects: list[str]
-) -> dict[str, dict[str, object]]:
-    availability: dict[str, dict[str, object]] = {}
-    for subject in subjects:
-        last_error: RuntimeError | None = None
-        for _ in range(2):
-            try:
-                availability[subject] = query_single_subject(dataset, subject)
-                last_error = None
-                break
-            except RuntimeError as exc:
-                last_error = exc
-        if last_error is not None:
-            availability[subject] = {
-                "has_anat": 0,
-                "has_rest_bold": 0,
-                "has_rest_forward": 0,
-                "has_rest_reverse": 0,
-                "has_fmap": 0,
-                "rest_bold_files": 0,
-                "query_failed": 1,
-                "query_error": str(last_error),
-            }
-    return availability
-
-
-def annotate_rows(
-    rows: list[dict[str, str]], availability: dict[str, dict[str, object]]
-) -> list[dict[str, object]]:
-    annotated: list[dict[str, object]] = []
+def annotate_rows(dataset: str, rows: list[dict[str, str]]) -> list[dict[str, object]]:
+    annotated = []
     for row in rows:
         subject = row["participant_id"]
-        out = dict(row)
-        out.update(availability[subject])
-        annotated.append(out)
+        query = query_single_subject(dataset, subject)
+        annotated.append(
+            {
+                **row,
+                "subject_id": subject,
+                **query,
+            }
+        )
     return annotated
 
 
 def filter_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
-    # This is the actual gate for the project: the subject needs anat plus the forward rest run.
     return [
         row
         for row in rows
-        if int(row["has_anat"]) == 1 and int(row["has_rest_forward"]) == 1
+        if int(row["has_remote_anat"]) == 1 and int(row["has_remote_forward_rest"]) == 1
     ]
 
 
@@ -260,55 +179,30 @@ def main() -> None:
 
     young_fieldnames, young_rows = load_rows(young_input)
     older_fieldnames, older_rows = load_rows(older_input)
-    all_subjects = [row["participant_id"] for row in young_rows + older_rows]
-    # I query availability once up front so the younger and older tables are filtered consistently.
-    availability = fetch_subject_availability(args.dataset, all_subjects)
 
-    failed_subjects = [
-        subject for subject, remote in availability.items() if int(remote["query_failed"]) == 1
-    ]
-    if failed_subjects and not args.allow_partial_results:
-        raise RuntimeError(
-            "Remote metadata queries failed for "
-            f"{len(failed_subjects)} participants. "
-            "Rerun when the connection is stable, or use --allow-partial-results."
-        )
+    young_annotated = annotate_rows(args.dataset, young_rows)
+    older_annotated = annotate_rows(args.dataset, older_rows)
 
-    extra_fields = [
-        "has_anat",
-        "has_rest_bold",
-        "has_rest_forward",
-        "has_rest_reverse",
-        "has_fmap",
-        "rest_bold_files",
-        "query_failed",
-        "query_error",
+    annotated_fieldnames = young_fieldnames + [
+        "subject_id",
+        "has_remote_anat",
+        "has_remote_forward_rest",
+        "n_remote_forward_rest_files",
     ]
-    young_annotated = annotate_rows(young_rows, availability)
-    older_annotated = annotate_rows(older_rows, availability)
+
+    write_rows(young_annotated_output, annotated_fieldnames, young_annotated)
+    write_rows(older_annotated_output, annotated_fieldnames, older_annotated)
+
     young_filtered = filter_rows(young_annotated)
     older_filtered = filter_rows(older_annotated)
 
-    write_rows(young_annotated_output, young_fieldnames + extra_fields, young_annotated)
-    write_rows(older_annotated_output, older_fieldnames + extra_fields, older_annotated)
-    write_rows(young_filtered_output, young_fieldnames + extra_fields, young_filtered)
-    write_rows(older_filtered_output, older_fieldnames + extra_fields, older_filtered)
+    write_rows(young_filtered_output, annotated_fieldnames, young_filtered)
+    write_rows(older_filtered_output, annotated_fieldnames, older_filtered)
 
     print(f"Wrote annotated younger table to {young_annotated_output}")
     print(f"Wrote annotated older table to {older_annotated_output}")
-    print(
-        f"Wrote {len(young_filtered)} younger participants with remote anat and forward rest "
-        f"to {young_filtered_output}"
-    )
-    print(
-        f"Wrote {len(older_filtered)} older participants with remote anat and forward rest "
-        f"to {older_filtered_output}"
-    )
-    if failed_subjects:
-        print(
-            f"Warning: remote queries failed for {len(failed_subjects)} participants. "
-            "Those rows were marked unavailable."
-        )
+    print(f"Wrote filtered younger table to {young_filtered_output}")
+    print(f"Wrote filtered older table to {older_filtered_output}")
 
 
 if __name__ == "__main__":

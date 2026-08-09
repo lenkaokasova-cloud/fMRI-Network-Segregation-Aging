@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
 os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve()))
@@ -28,6 +29,17 @@ from nilearn import datasets, image, plotting
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from dissertation_figure_style import (
+    AXIS_TEXT_COLOR,
+    TEXT_COLOR,
+    TITLE_SIZE,
+    TICK_SIZE,
+    apply_dissertation_rcparams,
+)
+
 NETWORK_ORDER = ["Vis", "SomMot", "DorsAttn", "SalVentAttn", "Limbic", "Cont", "Default"]
 NETWORK_COLORS = [
     "#4E79A7",
@@ -38,6 +50,8 @@ NETWORK_COLORS = [
     "#F28E2B",
     "#EDC948",
 ]
+
+apply_dissertation_rcparams(title_size=TITLE_SIZE, tick_size=TICK_SIZE)
 
 
 def parse_args() -> argparse.Namespace:
@@ -332,7 +346,7 @@ def save_dissertation_network_figure(
             black_bg=False,
             cmap=cmap,
         )
-        ax.set_title(panel_title, fontsize=11, pad=10)
+        ax.set_title(panel_title, fontsize=11, pad=10, color=AXIS_TEXT_COLOR, fontweight="bold")
         display.close()
 
     legend_handles = [
@@ -346,11 +360,13 @@ def save_dissertation_network_figure(
         frameon=False,
         fontsize=9,
         bbox_to_anchor=(0.5, 0.02),
+        labelcolor=TEXT_COLOR,
     )
     fig.suptitle(
         f"{subject}: Schaefer 200 / Yeo 7 atlas on normalized T1w",
         fontsize=14,
         fontweight="bold",
+        color=AXIS_TEXT_COLOR,
         y=0.98,
     )
     fig.subplots_adjust(left=0.02, right=0.98, top=0.84, bottom=0.18, wspace=0.03)

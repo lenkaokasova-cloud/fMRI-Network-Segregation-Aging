@@ -1,13 +1,13 @@
 # Preprocessing Notes
 
-These are my working notes for the locked preprocessing branch I am actually using.
+These are just working notes for the locked preprocessing branch I am actually using.
 
 ## 1. Main branch I am treating as primary
 
 The main dissertation branch is now:
 
 - final sample file:
-  [ds005752_final_analysis_sample_tr_3s.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/screening/ds005752_final_analysis_sample_tr_3s.tsv)
+  [ds005752_final_analysis_sample_tr_3s.tsv](../data/processed/screening/ds005752_final_analysis_sample_tr_3s.tsv)
 - total `n = 44`
 - younger `n = 33`
 - older `n = 11`
@@ -24,7 +24,7 @@ The current preprocessing branch is basically in line with:
 - study-specific denoising done later rather than inside `fMRIPrep`
 - a motion + `aCompCor` nuisance model without making global signal regression the default (`Behzadi et al., 2007`; `Muschelli et al., 2014`; `Murphy and Fox, 2017`)
 
-So overall this is not a strange pipeline. It is pretty recognizable for resting-state fMRI.
+So overall this is a pretty standard resting-state fMRI pipeline. Nothing especially odd there.
 
 ## 3. Sample flow I ended up with
 
@@ -45,7 +45,7 @@ Current sample flow:
 
 The sample-flow figure for this is:
 
-- [sample_flow_primary.png](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/qc/reporting/figures/sample_flow_primary.png)
+- [sample_flow_primary.png](../data/processed/qc/reporting/figures/sample_flow_primary.png)
 
 ## 4. What counted as raw-data eligibility
 
@@ -142,15 +142,13 @@ A participant only entered the clean preprocessed pool if:
 - the required forward-run outputs existed
 - manual `fMRIPrep` review was marked `pass`
 - the run had at least `200` acquired volumes
-- at least `7.5` minutes remained after censoring
+- at least `9.0` minutes remained after censoring
 - `mean_fd < 0.20 mm`
 - `pct_fd_gt_0p2 < 25%`
 
 I used retained time rather than retained volume count because the broader processed dataset originally included more than one TR, so retained minutes was the fairer comparison.
 
-Important note to myself:
-
-- `7.5` minutes here is a minimum inclusion rule
+- `9.0` minutes here is a minimum inclusion rule
 - it is not meant to be presented as an ideal or optimal scan length
 
 These rules fit fairly well with the standard motion and censoring literature (`Power et al., 2014`; `Satterthwaite et al., 2013`; `Ciric et al., 2017`).
@@ -159,7 +157,7 @@ These rules fit fairly well with the standard motion and censoring literature (`
 
 Before denoising, I check atlas alignment with:
 
-- [09_check_atlas_overlay.py](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/code/primary/09_check_atlas_overlay.py)
+- [09_check_atlas_overlay.py](../code/primary/09_check_atlas_overlay.py)
 
 This overlays the `Schaefer 200 / Yeo 7` atlas onto each participant's normalized `T1w` image in MNI `2 mm` space.
 
@@ -168,13 +166,13 @@ The point of this step is just to make sure the atlas sits sensibly on the norma
 Outputs:
 
 - `data/processed/qc/atlas_overlay/figures/`
-- [atlas_overlay_summary.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/qc/atlas_overlay/atlas_overlay_summary.tsv)
+- [atlas_overlay_summary.tsv](../data/processed/qc/atlas_overlay/atlas_overlay_summary.tsv)
 
 ## 11. Study-specific denoising
 
 Main denoising is done by:
 
-- [10_run_denoising.py](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/code/primary/10_run_denoising.py)
+- [10_run_denoising.py](../code/primary/10_run_denoising.py)
 
 Main library:
 
@@ -207,7 +205,7 @@ The main branch does not automatically add:
 
 Those are treated as sensitivity options instead.
 
-So this is a reasonable scrub rule, but I should describe it as moderate rather than ultra-conservative.
+So this is a reasonable scrub rule, but I should probably describe it as moderate rather than ultra-conservative.
 
 ## 14. Nuisance regressors in the main branch
 
@@ -221,7 +219,7 @@ The main nuisance model includes:
 
 The main branch does not include global signal regression. GSR is only kept as a separate sensitivity branch.
 
-That is a defensible choice, but I should write it as one accepted approach rather than the only correct one (`Murphy and Fox, 2017`).
+I should write this as one accepted approach rather than sounding like it is the only correct one (`Murphy and Fox, 2017`).
 
 ## 15. Note to self on aCompCor
 
@@ -237,7 +235,7 @@ In the current primary sample, cumulative variance explained by the first six `a
 
 This is recorded in:
 
-- [subject_denoising_summary.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/denoising/metrics/subject_denoising_summary.tsv)
+- [subject_denoising_summary.tsv](../data/processed/denoising/metrics/subject_denoising_summary.tsv)
 
 ## 16. Physiological noise note
 
@@ -272,9 +270,15 @@ Main denoising outputs are:
 
 - denoised parcel time series:
   `data/processed/denoising/timeseries/sub-*_forward_timeseries.npy`
-- [subject_denoising_summary.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/denoising/metrics/subject_denoising_summary.tsv)
-- [denoising_settings.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/denoising/metrics/denoising_settings.tsv)
-- [atlas_labels.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/denoising/metrics/atlas_labels.tsv)
+- [subject_denoising_summary.tsv](../data/processed/denoising/metrics/subject_denoising_summary.tsv)
+- [denoising_settings.tsv](../data/processed/denoising/metrics/denoising_settings.tsv)
+- [atlas_labels.tsv](../data/processed/denoising/metrics/atlas_labels.tsv)
+
+Important interpretation boundary:
+
+- these denoised parcel time series are cleaned BOLD signals, not direct neural recordings
+- nuisance regression and censoring reduce non-neural variance, but they do not turn the data into a pure measure of neuronal activity
+- later connectivity and segregation results should therefore be described as BOLD-based functional connectivity estimates
 
 ## 19. Extra QC reporting I added later
 
@@ -290,18 +294,18 @@ To make the QC story stronger, the workflow now also writes:
 
 These are generated by:
 
-- [15_build_qc_reporting.py](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/code/utilities/15_build_qc_reporting.py)
+- [15_build_qc_reporting.py](../code/utilities/15_build_qc_reporting.py)
 
 Key outputs:
 
 - `data/processed/qc/reporting/figures/`
 - `data/processed/qc/reporting/motion_traces/`
-- [qcfc_summary.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/qc/reporting/qcfc_summary.tsv)
-- [qcfc_edge_summary.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/qc/reporting/qcfc_edge_summary.tsv)
+- [qcfc_summary.tsv](../data/processed/qc/reporting/qcfc_summary.tsv)
+- [qcfc_edge_summary.tsv](../data/processed/qc/reporting/qcfc_edge_summary.tsv)
 
 These QC-FC outputs are there to show the residual motion pattern honestly, not to pretend motion is gone completely.
 
-## 20. Sensitivity branches I now have
+## 20. Formal sensitivity branches I now have
 
 The preprocessing / denoising side now includes these named sensitivity branches:
 
@@ -309,6 +313,8 @@ The preprocessing / denoising side now includes these named sensitivity branches
 - Schaefer-100 branch
 - partial-correlation branch
 - adjacent-frame scrub branch
+
+These are formal supplementary branches around the locked primary pipeline. They do not replace the main no-`GSR`, Pearson-correlation, `Schaefer 200` branch.
 
 For the adjacent-frame branch, each flagged motion spike is expanded by:
 
@@ -323,6 +329,12 @@ The partial-correlation branch is stored under:
 
 - `data/processed/sensitivity/partial_correlation/`
 
+Other robustness checks linked to the same preprocessing / denoising decisions are handled later in the analysis stage, including:
+
+- stricter motion subset analysis
+- retained-time covariate sensitivity
+- leave-one-older-out influence checks
+
 ## 21. Main limitations I still need to say clearly
 
 Even with the improvements, I should still say explicitly that:
@@ -331,6 +343,7 @@ Even with the improvements, I should still say explicitly that:
 - the main censoring rule is transparent and defensible, but not the most conservative possible
 - physiological recordings were not available
 - the no-`GSR` branch is one valid choice, not the only one
+- denoised BOLD time series are still indirect measures of underlying neural activity
 
 Being open about that makes the workflow look stronger, not weaker.
 
@@ -346,15 +359,15 @@ That is worth keeping in mind when writing anything about memory or limbic effec
 
 Current reproducibility files:
 
-- [software_versions.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/reproducibility/software_versions.tsv)
-- [workflow_context.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/reproducibility/workflow_context.tsv)
-- [fmri_aging_environment.yml](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/reproducibility/fmri_aging_environment.yml)
+- [software_versions.tsv](../data/processed/reproducibility/software_versions.tsv)
+- [workflow_context.tsv](../data/processed/reproducibility/workflow_context.tsv)
+- [fmri_aging_environment.yml](../data/processed/reproducibility/fmri_aging_environment.yml)
 
 Main implementation details are also recoverable from:
 
-- [05_run_fmriprep_subjects.sh](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/code/primary/05_run_fmriprep_subjects.sh)
-- [10_run_denoising.py](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/code/primary/10_run_denoising.py)
-- [denoising_settings.tsv](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/data/processed/denoising/metrics/denoising_settings.tsv)
+- [05_run_fmriprep_subjects.sh](../code/primary/05_run_fmriprep_subjects.sh)
+- [10_run_denoising.py](../code/primary/10_run_denoising.py)
+- [denoising_settings.tsv](../data/processed/denoising/metrics/denoising_settings.tsv)
 
 Current workflow snapshot commit:
 

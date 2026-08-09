@@ -29,24 +29,45 @@ COMPARISON_GROUP = "older"
 NORMATIVE_Z_THRESHOLD = 1.96
 GLOBAL_SEGREGATION_COL = "global_segregation_prop"
 NETWORK_SEGREGATION_COL = "segregation_prop"
-YOUNG_COLOR = "#4C78A8"
-OLDER_COLOR = "#D16A3A"
-REFERENCE_LINE_COLOR = "#1F3A5F"
-REFERENCE_RANGE_COLOR = "#3E73B3"
-POSITIVE_COLOR = "#4C78A8"
-NEGATIVE_COLOR = "#D16A3A"
+YOUNG_COLOR = "#5E7FA6"
+OLDER_COLOR = "#C07A5B"
+REFERENCE_LINE_COLOR = "#253547"
+REFERENCE_RANGE_COLOR = "#6B8EB5"
+POSITIVE_COLOR = "#5E7FA6"
+NEGATIVE_COLOR = "#C07A5B"
+NETWORK_EXTENSION_COLOR = "#7A9C8B"
+NETWORK_EXTENSION_EDGE_COLOR = "#355D4C"
 BURDEN_COLOR = "#B55223"
-BURDEN_NEUTRAL_COLOR = "#B8BDC7"
-GRID_COLOR = "#B8BDC7"
+BURDEN_NEUTRAL_COLOR = "#C5CBD4"
+TEXT_COLOR = "#253547"
+SUBTLE_TEXT_COLOR = "#5A6573"
+AXIS_TEXT_COLOR = "#18222D"
+GRID_COLOR = "#D7DCE4"
 HEATMAP_CMAP = "coolwarm"
 FIG_DPI = 300
-TITLE_SIZE = 15
-LABEL_SIZE = 12
-TICK_SIZE = 11
-LEGEND_SIZE = 11
+TITLE_SIZE = 14
+LABEL_SIZE = 11
+TICK_SIZE = 10
+LEGEND_SIZE = 10
+SUMMARY_AXIS_LABEL_SIZE = 12.5
+SUMMARY_TICK_LABEL_SIZE = 11.5
+SUMMARY_TITLE_SIZE = 15
+SUMMARY_ANNOTATION_SIZE = 10.8
+FONT_FAMILY = "serif"
+FONT_SERIF = [
+    "Times New Roman",
+    "Times",
+    "Nimbus Roman",
+    "TeX Gyre Termes",
+    "STIX Two Text",
+    "Liberation Serif",
+    "DejaVu Serif",
+]
 
 plt.rcParams.update(
     {
+        "font.family": FONT_FAMILY,
+        "font.serif": FONT_SERIF,
         "font.size": TICK_SIZE,
         "axes.titlesize": TITLE_SIZE,
         "axes.labelsize": LABEL_SIZE,
@@ -54,6 +75,14 @@ plt.rcParams.update(
         "ytick.labelsize": TICK_SIZE,
         "legend.fontsize": LEGEND_SIZE,
         "figure.titlesize": TITLE_SIZE,
+        "axes.titleweight": "semibold",
+        "axes.labelcolor": TEXT_COLOR,
+        "axes.edgecolor": TEXT_COLOR,
+        "axes.linewidth": 0.9,
+        "text.color": TEXT_COLOR,
+        "xtick.color": TEXT_COLOR,
+        "ytick.color": TEXT_COLOR,
+        "mathtext.fontset": "stix",
     }
 )
 
@@ -322,6 +351,11 @@ def style_axis(
 
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color(TEXT_COLOR)
+    ax.spines["bottom"].set_color(TEXT_COLOR)
+    ax.spines["left"].set_linewidth(0.9)
+    ax.spines["bottom"].set_linewidth(0.9)
+    ax.tick_params(axis="both", length=4.2, width=0.8, color=TEXT_COLOR)
     ax.tick_params(axis="x", labelrotation=xrotation)
     for label in ax.get_xticklabels():
         label.set_horizontalalignment("right" if xrotation else "center")
@@ -331,6 +365,19 @@ def save_figure(fig: plt.Figure, outpath: Path) -> None:
     fig.tight_layout()
     fig.savefig(outpath, dpi=FIG_DPI, bbox_inches="tight", facecolor="white")
     plt.close(fig)
+
+
+def emphasize_summary_axis(ax: plt.Axes) -> None:
+    ax.xaxis.label.set_color(AXIS_TEXT_COLOR)
+    ax.yaxis.label.set_color(AXIS_TEXT_COLOR)
+    ax.xaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    ax.yaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    ax.title.set_fontsize(SUMMARY_TITLE_SIZE)
+    ax.title.set_fontweight("bold")
+    ax.tick_params(axis="both", labelcolor=AXIS_TEXT_COLOR)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_color(AXIS_TEXT_COLOR)
+        label.set_fontsize(SUMMARY_TICK_LABEL_SIZE)
 
 
 def build_sample_summary(global_df: pd.DataFrame) -> pd.DataFrame:
@@ -458,7 +505,7 @@ def plot_global_reference(
     ref_lower = float(reference["reference_z_lower"].iloc[0])
     ref_upper = float(reference["reference_z_upper"].iloc[0])
 
-    fig, ax = plt.subplots(figsize=(7, 4.5))
+    fig, ax = plt.subplots(figsize=(7.2, 4.6))
     ref_x = np.zeros(len(reference))
     old_x = np.ones(len(older))
     if len(reference):
@@ -466,20 +513,69 @@ def plot_global_reference(
     if len(older):
         old_x += np.linspace(-0.12, 0.12, len(older))
 
-    ax.scatter(ref_x, reference[GLOBAL_SEGREGATION_COL], color=YOUNG_COLOR, s=60, label=reference_group)
-    ax.scatter(old_x, older[GLOBAL_SEGREGATION_COL], color=OLDER_COLOR, s=60, label=comparison_group)
+    ax.scatter(
+        ref_x,
+        reference[GLOBAL_SEGREGATION_COL],
+        color=YOUNG_COLOR,
+        s=62,
+        label=reference_group.title(),
+        edgecolors="white",
+        linewidths=0.7,
+    )
+    ax.scatter(
+        old_x,
+        older[GLOBAL_SEGREGATION_COL],
+        color=OLDER_COLOR,
+        s=62,
+        label=comparison_group.title(),
+        edgecolors="white",
+        linewidths=0.7,
+    )
     ax.axhline(ref_mean, color=REFERENCE_LINE_COLOR, linestyle="-", linewidth=2.2, alpha=0.95)
     ax.axhline(ref_lower, color=REFERENCE_RANGE_COLOR, linestyle="--", linewidth=1.6, alpha=0.9)
     ax.axhline(ref_upper, color=REFERENCE_RANGE_COLOR, linestyle="--", linewidth=1.6, alpha=0.9)
     ax.set_xticks([0, 1])
-    ax.set_xticklabels([reference_group, comparison_group])
+    ax.set_xticklabels([reference_group.title(), comparison_group.title()])
     style_axis(
         ax,
-        title="Global Segregation Relative to Younger Norms",
+        title="Global segregation relative to younger reference",
         ylabel="Global segregation",
     )
-    ax.grid(axis="y", color=GRID_COLOR, alpha=0.28, linewidth=0.9)
-    ax.legend(frameon=False, loc="upper left", bbox_to_anchor=(1.01, 1.0), borderaxespad=0.0)
+    emphasize_summary_axis(ax)
+    ax.grid(axis="y", color=GRID_COLOR, alpha=0.55, linewidth=0.8)
+    ax.text(
+        1.01,
+        ref_lower,
+        "Younger 95%\nreference range",
+        transform=ax.get_yaxis_transform(),
+        ha="left",
+        va="center",
+        fontsize=SUMMARY_ANNOTATION_SIZE,
+        color=REFERENCE_RANGE_COLOR,
+        clip_on=False,
+    )
+    ax.text(
+        1.01,
+        ref_upper,
+        "Younger 95%\nreference range",
+        transform=ax.get_yaxis_transform(),
+        ha="left",
+        va="center",
+        fontsize=SUMMARY_ANNOTATION_SIZE,
+        color=REFERENCE_RANGE_COLOR,
+        clip_on=False,
+    )
+    ax.text(
+        1.01,
+        ref_mean,
+        "Younger mean",
+        transform=ax.get_yaxis_transform(),
+        ha="left",
+        va="center",
+        fontsize=SUMMARY_ANNOTATION_SIZE,
+        color=REFERENCE_LINE_COLOR,
+        clip_on=False,
+    )
     save_figure(fig, outpath)
 
 
@@ -562,18 +658,24 @@ def plot_global_distribution(
 
 def plot_network_mean_z(network_summary: pd.DataFrame, outpath: Path) -> None:
     fig, ax = plt.subplots(figsize=(8, 4.5))
-    colors = [NEGATIVE_COLOR if value < 0 else POSITIVE_COLOR for value in network_summary["mean_older_z_score"]]
-    ax.bar(network_summary["network"], network_summary["mean_older_z_score"], color=colors)
-    ax.axhline(0.0, color="black", linewidth=1)
-    ax.axhline(-NORMATIVE_Z_THRESHOLD, color="gray", linestyle="--", linewidth=1)
-    ax.axhline(NORMATIVE_Z_THRESHOLD, color="gray", linestyle="--", linewidth=1)
+    ax.bar(
+        network_summary["network"],
+        network_summary["mean_older_z_score"],
+        color=NETWORK_EXTENSION_COLOR,
+        edgecolor=NETWORK_EXTENSION_EDGE_COLOR,
+        linewidth=1.0,
+    )
+    ax.axhline(0.0, color=REFERENCE_LINE_COLOR, linewidth=1.35)
+    ax.axhline(-NORMATIVE_Z_THRESHOLD, color=SUBTLE_TEXT_COLOR, linestyle="--", linewidth=1.1)
+    ax.axhline(NORMATIVE_Z_THRESHOLD, color=SUBTLE_TEXT_COLOR, linestyle="--", linewidth=1.1)
     style_axis(
         ax,
-        title="Mean Older Deviation by Network",
+        title="Mean older deviation by network",
         ylabel="Mean z-score vs younger reference",
         xrotation=35,
     )
-    ax.grid(axis="y", color=GRID_COLOR, alpha=0.28, linewidth=0.9)
+    emphasize_summary_axis(ax)
+    ax.grid(axis="y", color=GRID_COLOR, alpha=0.55, linewidth=0.8)
     save_figure(fig, outpath)
 
 
@@ -624,13 +726,13 @@ def plot_network_reference_ranges(
     ax.set_xticklabels(network_order, rotation=35, ha="right")
     style_axis(
         ax,
-        title="Network Segregation Relative to Younger Reference Ranges",
+        title="Network segregation relative to younger reference ranges",
         ylabel="Network segregation",
         xrotation=35,
     )
-    ax.grid(axis="y", color=GRID_COLOR, alpha=0.28, linewidth=0.9)
-    ax.scatter([], [], color=YOUNG_COLOR, alpha=0.30, s=25, label=reference_group)
-    ax.scatter([], [], color=OLDER_COLOR, s=42, label=comparison_group)
+    ax.grid(axis="y", color=GRID_COLOR, alpha=0.55, linewidth=0.8)
+    ax.scatter([], [], color=YOUNG_COLOR, alpha=0.30, s=25, label=reference_group.title())
+    ax.scatter([], [], color=OLDER_COLOR, s=42, label=comparison_group.title())
     ax.plot([], [], color=REFERENCE_RANGE_COLOR, linewidth=3.2, label="younger 95% range")
     ax.plot([], [], color=REFERENCE_LINE_COLOR, linewidth=2.6, label="younger mean")
     ax.legend(frameon=False, ncol=2, loc="upper right")
@@ -700,8 +802,16 @@ def plot_older_network_heatmap(normative_network_df: pd.DataFrame, comparison_gr
         ylabel="Older participant",
         xrotation=45,
     )
+    emphasize_summary_axis(ax)
     cbar = fig.colorbar(im, ax=ax, shrink=0.9)
-    cbar.set_label("z-score vs younger reference", fontsize=LABEL_SIZE)
+    cbar.set_label(
+        "z-score vs younger reference",
+        fontsize=SUMMARY_AXIS_LABEL_SIZE,
+        color=AXIS_TEXT_COLOR,
+    )
+    cbar.ax.tick_params(labelsize=SUMMARY_TICK_LABEL_SIZE, colors=AXIS_TEXT_COLOR)
+    cbar.outline.set_edgecolor(TEXT_COLOR)
+    cbar.outline.set_linewidth(0.9)
     save_figure(fig, outpath)
 
 

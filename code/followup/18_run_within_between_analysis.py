@@ -26,18 +26,35 @@ import statsmodels.formula.api as smf
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 NETWORK_ORDER = ["Vis", "SomMot", "DorsAttn", "SalVentAttn", "Limbic", "Cont", "Default"]
 SEGREGATION_COL = "segregation_prop"
-YOUNG_COLOR = "#4C78A8"
-OLDER_COLOR = "#D16A3A"
-GRID_COLOR = "#B8BDC7"
-REFERENCE_LINE_COLOR = "#1F3A5F"
+YOUNG_COLOR = "#5E7FA6"
+OLDER_COLOR = "#C07A5B"
+TEXT_COLOR = "#253547"
+AXIS_TEXT_COLOR = "#18222D"
+GRID_COLOR = "#D7DCE4"
+REFERENCE_LINE_COLOR = "#253547"
 FIG_DPI = 300
-TITLE_SIZE = 15
-LABEL_SIZE = 12
+TITLE_SIZE = 14
+LABEL_SIZE = 11
 TICK_SIZE = 11
-LEGEND_SIZE = 11
+LEGEND_SIZE = 10
+SUMMARY_AXIS_LABEL_SIZE = 12.5
+SUMMARY_TICK_LABEL_SIZE = 11.5
+SUMMARY_TITLE_SIZE = 15
+FONT_FAMILY = "serif"
+FONT_SERIF = [
+    "Times New Roman",
+    "Times",
+    "Nimbus Roman",
+    "TeX Gyre Termes",
+    "STIX Two Text",
+    "Liberation Serif",
+    "DejaVu Serif",
+]
 
 plt.rcParams.update(
     {
+        "font.family": FONT_FAMILY,
+        "font.serif": FONT_SERIF,
         "font.size": TICK_SIZE,
         "axes.titlesize": TITLE_SIZE,
         "axes.labelsize": LABEL_SIZE,
@@ -45,6 +62,14 @@ plt.rcParams.update(
         "ytick.labelsize": TICK_SIZE,
         "legend.fontsize": LEGEND_SIZE,
         "figure.titlesize": TITLE_SIZE,
+        "axes.titleweight": "semibold",
+        "axes.labelcolor": TEXT_COLOR,
+        "axes.edgecolor": TEXT_COLOR,
+        "axes.linewidth": 0.9,
+        "text.color": TEXT_COLOR,
+        "xtick.color": TEXT_COLOR,
+        "ytick.color": TEXT_COLOR,
+        "mathtext.fontset": "stix",
     }
 )
 
@@ -102,6 +127,11 @@ def style_axis(
         ax.set_ylabel(ylabel)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color(TEXT_COLOR)
+    ax.spines["bottom"].set_color(TEXT_COLOR)
+    ax.spines["left"].set_linewidth(0.9)
+    ax.spines["bottom"].set_linewidth(0.9)
+    ax.tick_params(axis="both", length=4.2, width=0.8, color=TEXT_COLOR)
     ax.tick_params(axis="x", labelrotation=xrotation)
     for label in ax.get_xticklabels():
         label.set_ha("right" if xrotation else "center")
@@ -120,6 +150,19 @@ def group_offsets(n_points: int, width: float = 0.12) -> np.ndarray:
     if n_points == 1:
         return np.array([0.0])
     return np.linspace(-width, width, n_points)
+
+
+def emphasize_summary_axis(ax: plt.Axes) -> None:
+    ax.xaxis.label.set_color(AXIS_TEXT_COLOR)
+    ax.yaxis.label.set_color(AXIS_TEXT_COLOR)
+    ax.xaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    ax.yaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    ax.title.set_fontsize(SUMMARY_TITLE_SIZE)
+    ax.title.set_fontweight("semibold")
+    ax.tick_params(axis="both", labelcolor=AXIS_TEXT_COLOR)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_color(AXIS_TEXT_COLOR)
+        label.set_fontsize(SUMMARY_TICK_LABEL_SIZE)
 
 
 def load_tables(sample_path: Path, connectivity_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -344,17 +387,18 @@ def plot_subject_components(subject_df: pd.DataFrame, outpath: Path) -> None:
                 np.full(len(subset), x_pos) + offsets,
                 subset[column],
                 color=color,
-                s=78,
-                alpha=0.92,
+                s=72,
+                alpha=0.94,
                 edgecolors="white",
-                linewidths=0.6,
+                linewidths=0.8,
                 zorder=3,
             )
 
         style_axis(ax, title=title, ylabel="Mean Fisher z connectivity")
+        emphasize_summary_axis(ax)
         ax.set_xticks([0, 1])
-        ax.set_xticklabels(["young", "older"])
-        ax.grid(axis="y", color=GRID_COLOR, alpha=0.28, linewidth=0.9)
+        ax.set_xticklabels(["Young", "Older"])
+        ax.grid(axis="y", color=GRID_COLOR, alpha=0.55, linewidth=0.8)
 
     save_figure(fig, outpath)
 
@@ -370,12 +414,12 @@ def plot_network_means(network_summary: pd.DataFrame, outpath: Path) -> None:
     ]
 
     for ax, (young_col, older_col, title) in zip(axes, specs):
-        ax.plot(x, network_summary[young_col], color=YOUNG_COLOR, marker="o", linewidth=2.0, label="young")
-        ax.plot(x, network_summary[older_col], color=OLDER_COLOR, marker="o", linewidth=2.0, label="older")
+        ax.plot(x, network_summary[young_col], color=YOUNG_COLOR, marker="o", linewidth=2.0, label="Young")
+        ax.plot(x, network_summary[older_col], color=OLDER_COLOR, marker="o", linewidth=2.0, label="Older")
         style_axis(ax, title=title, ylabel="Mean Fisher z connectivity")
         ax.set_xticks(x)
         ax.set_xticklabels(networks, rotation=35)
-        ax.grid(axis="y", color=GRID_COLOR, alpha=0.28, linewidth=0.9)
+        ax.grid(axis="y", color=GRID_COLOR, alpha=0.55, linewidth=0.8)
 
     axes[1].legend(frameon=False, loc="upper left", bbox_to_anchor=(1.01, 1.0), borderaxespad=0.0)
     save_figure(fig, outpath)
@@ -417,9 +461,9 @@ def plot_network_age_effects(network_effect_df: pd.DataFrame, outpath: Path) -> 
             zorder=2,
         )
         ax.scatter(estimates, y, s=80, c=colors, edgecolors="white", linewidths=0.6, zorder=3)
-        ax.axvline(0.0, color=REFERENCE_LINE_COLOR, linewidth=1.4, linestyle="--")
+        ax.axvline(0.0, color=REFERENCE_LINE_COLOR, linewidth=1.2, linestyle="--")
         style_axis(ax, title=title, xlabel="Older minus young estimate")
-        ax.grid(axis="x", color=GRID_COLOR, alpha=0.28, linewidth=0.9)
+        ax.grid(axis="x", color=GRID_COLOR, alpha=0.55, linewidth=0.8)
         ax.set_yticks(y)
         ax.set_yticklabels(networks)
 

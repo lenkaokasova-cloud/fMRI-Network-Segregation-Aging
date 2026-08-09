@@ -99,7 +99,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-retained-minutes",
         type=float,
-        default=7.5,
+        default=9.0,
         help="Fail if fewer than this many minutes remain after censoring.",
     )
     parser.add_argument(

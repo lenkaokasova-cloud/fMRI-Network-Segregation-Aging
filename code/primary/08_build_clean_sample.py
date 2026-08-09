@@ -83,7 +83,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-retained-minutes",
         type=float,
-        default=7.5,
+        default=9.0,
         help=(
             "Minimum retained time in minutes after censoring. This is the "
             "primary current QC rule and overrides --min-retained-volumes."
@@ -199,7 +199,6 @@ def main() -> None:
         load_manual_qc_rows(manual_qc_path) if manual_qc_path.exists() else {}
     )
 
-    # This is the step where the automated QC numbers and the manual HTML review finally meet.
     decisions: list[dict[str, object]] = []
     included: list[dict[str, object]] = []
 
@@ -225,134 +224,109 @@ def main() -> None:
             ),
             None,
         )
-        report_path = derivatives_dir / f"{subject}.html"
+        html_path = derivatives_dir / f"{subject}.html"
         qc_row = load_forward_qc(qc_dir, subject)
         manual_qc_row = manual_qc_rows.get(subject, {})
-        manual_qc_status = normalize_manual_qc_status(
-            manual_qc_row.get("manual_qc_status")
+        manual_qc_status = normalize_manual_qc_status(manual_qc_row.get("review_status"))
+
+        has_required_outputs = all(
+            path is not None and path.exists()
+            for path in (bold_path, confounds_path, json_path)
+        ) and html_path.exists()
+        has_raw_subject = raw_subject_dir.exists()
+        mean_fd = float(qc_row["mean_fd"]) if qc_row and qc_row.get("mean_fd") else None
+        pct_fd_0p2 = (
+            float(qc_row["pct_fd_gt_0p2"]) if qc_row and qc_row.get("pct_fd_gt_0p2") else None
         )
+        n_volumes = int(float(qc_row["n_volumes"])) if qc_row and qc_row.get("n_volumes") else None
+        retained_volumes = (
+            int(float(qc_row["n_volumes_retained_after_scrub"]))
+            if qc_row and qc_row.get("n_volumes_retained_after_scrub")
+            else None
+        )
+        retained_minutes = (
+            float(qc_row["retained_minutes_after_scrub"])
+            if qc_row and qc_row.get("retained_minutes_after_scrub")
+            else None
+        )
+        repetition_time = load_repetition_time(json_path) if json_path and json_path.exists() else None
 
-        decision = "include"
-        reason = "Accepted for connectivity analysis."
-        n_volumes = ""
-        mean_fd = ""
-        pct_fd = ""
-        n_retained_after_scrub = ""
-        pct_retained_after_scrub = ""
-        repetition_time_seconds = ""
-        total_run_minutes = ""
-        retained_minutes_after_scrub = ""
+        include = True
+        exclusion_reasons: list[str] = []
 
-        if not raw_subject_dir.exists():
-            decision = "exclude"
-            reason = "Raw data were not downloaded."
-        elif not report_path.exists():
-            decision = "exclude"
-            reason = "fMRIPrep HTML report is missing."
-        elif bold_path is None or confounds_path is None or json_path is None:
-            decision = "exclude"
-            reason = "Required forward-run fMRIPrep outputs are missing."
-        elif qc_row is None:
-            decision = "exclude"
-            reason = "Forward-run QC summary is missing."
-        elif args.require_manual_qc and manual_qc_status != "pass":
-            decision = "exclude"
-            reason = (
-                "Manual fMRIPrep report review is not marked pass."
-                if manual_qc_status == "fail"
-                else "Manual fMRIPrep report review is still pending."
-            )
-        else:
-            if "n_retained_after_scrub" not in qc_row:
-                decision = "exclude"
-                reason = (
-                    "QC summary predates the current pipeline. Rerun "
-                    "code/primary/07_qc_from_confounds.py for this subject."
-                )
-            else:
-                n_volumes = int(qc_row["n_volumes"])
-                mean_fd = float(qc_row["mean_fd"])
-                pct_fd = float(qc_row["pct_fd_gt_0p2"])
-                n_retained_after_scrub = int(qc_row["n_retained_after_scrub"])
-                pct_retained_after_scrub = float(qc_row["pct_retained_after_scrub"])
-                repetition_time = load_repetition_time(json_path)
-                if repetition_time is not None:
-                    repetition_time_seconds = round(repetition_time, 3)
-                    total_run_minutes = round((n_volumes * repetition_time) / 60.0, 2)
-                    retained_minutes_after_scrub = round(
-                        (n_retained_after_scrub * repetition_time) / 60.0, 2
-                    )
-                if n_volumes < args.min_volumes:
-                    decision = "exclude"
-                    reason = f"Forward run has only {n_volumes} volumes (< {args.min_volumes})."
-                elif args.min_retained_minutes is not None:
-                    # Retained minutes is the main current rule because it stays comparable if TR differs.
-                    if repetition_time is None:
-                        decision = "exclude"
-                        reason = "Forward-run JSON is missing RepetitionTime."
-                    elif retained_minutes_after_scrub < args.min_retained_minutes:
-                        decision = "exclude"
-                        reason = (
-                            f"Only {retained_minutes_after_scrub:.2f} minutes remain after "
-                            f"censoring (< {args.min_retained_minutes:.2f})."
-                        )
-                elif n_retained_after_scrub < args.min_retained_volumes:
-                    decision = "exclude"
-                    reason = (
-                        f"Only {n_retained_after_scrub} volumes remain after censoring "
-                        f"(< {args.min_retained_volumes})."
-                    )
+        if not has_raw_subject:
+            include = False
+            exclusion_reasons.append("missing_raw_subject")
+        if not has_required_outputs:
+            include = False
+            exclusion_reasons.append("missing_required_outputs")
+        if qc_row is None:
+            include = False
+            exclusion_reasons.append("missing_forward_qc_row")
+        if manual_qc_status != "pass" and args.require_manual_qc:
+            include = False
+            exclusion_reasons.append(f"manual_qc_{manual_qc_status}")
+        if n_volumes is None or n_volumes < args.min_volumes:
+            include = False
+            exclusion_reasons.append("too_few_volumes")
+        if mean_fd is None or mean_fd >= args.mean_fd_max:
+            include = False
+            exclusion_reasons.append("mean_fd_too_high")
+        if pct_fd_0p2 is None or pct_fd_0p2 >= args.pct_fd_0p2_max:
+            include = False
+            exclusion_reasons.append("pct_fd_gt_0p2_too_high")
 
-                if decision == "include" and mean_fd >= args.mean_fd_max:
-                    decision = "exclude"
-                    reason = (
-                        f"Mean FD {mean_fd:.3f} mm exceeded the threshold of "
-                        f"{args.mean_fd_max:.3f} mm."
-                    )
-                elif decision == "include" and pct_fd >= args.pct_fd_0p2_max:
-                    decision = "exclude"
-                    reason = (
-                        f"{pct_fd:.2f}% of volumes exceeded FD > 0.2 mm, above the "
-                        f"{args.pct_fd_0p2_max:.2f}% threshold."
-                    )
+        if args.min_retained_minutes is not None:
+            if retained_minutes is None or retained_minutes < args.min_retained_minutes:
+                include = False
+                exclusion_reasons.append("retained_minutes_too_low")
+        elif retained_volumes is None or retained_volumes < args.min_retained_volumes:
+            include = False
+            exclusion_reasons.append("retained_volumes_too_low")
 
-        decision_row = {
+        decision = {
             "subject_id": subject,
-            "age": int(row["age"]),
-            "sex": row["sex"],
             "age_group": age_group,
-            "handedness": row["handedness"],
-            "release_1": row["release_1"],
-            "release_2": row["release_2"],
-            "has_remote_anat": int(row.get("has_anat", 0)),
-            "has_remote_rest_forward": int(row.get("has_rest_forward", 0)),
-            "raw_downloaded": int(raw_subject_dir.exists()),
-            "report_exists": int(report_path.exists()),
-            "forward_bold_exists": int(bold_path is not None),
-            "forward_confounds_exists": int(confounds_path is not None),
-            "forward_json_exists": int(json_path is not None),
-            "n_volumes": n_volumes,
-            "n_retained_after_scrub": n_retained_after_scrub,
-            "pct_retained_after_scrub": pct_retained_after_scrub,
-            "repetition_time_seconds": repetition_time_seconds,
-            "total_run_minutes": total_run_minutes,
-            "retained_minutes_after_scrub": retained_minutes_after_scrub,
-            "mean_fd": mean_fd,
-            "pct_fd_gt_0p2": pct_fd,
+            "age": row.get("age", ""),
+            "sex": row.get("sex", ""),
+            "include": int(include),
+            "exclusion_reasons": ";".join(exclusion_reasons),
             "manual_qc_status": manual_qc_status,
-            "decision": decision,
-            "decision_reason": reason,
+            "has_raw_subject": int(has_raw_subject),
+            "has_required_outputs": int(has_required_outputs),
+            "n_volumes": n_volumes if n_volumes is not None else "",
+            "retained_volumes_after_scrub": retained_volumes if retained_volumes is not None else "",
+            "retained_minutes_after_scrub": retained_minutes if retained_minutes is not None else "",
+            "mean_fd": mean_fd if mean_fd is not None else "",
+            "pct_fd_gt_0p2": pct_fd_0p2 if pct_fd_0p2 is not None else "",
+            "repetition_time": repetition_time if repetition_time is not None else "",
         }
-        decisions.append(decision_row)
-        if decision == "include":
-            included.append(decision_row)
+        decisions.append(decision)
 
-    fieldnames = list(decisions[0].keys()) if decisions else []
-    write_rows(decisions_output, fieldnames, decisions)
-    write_rows(output_path, fieldnames, included)
+        if include:
+            included.append(
+                {
+                    "subject_id": subject,
+                    "age_group": age_group,
+                    "age": row.get("age", ""),
+                    "sex": row.get("sex", ""),
+                    "mean_fd": mean_fd,
+                    "pct_fd_gt_0p2": pct_fd_0p2,
+                    "n_volumes": n_volumes,
+                    "retained_volumes_after_scrub": retained_volumes,
+                    "retained_minutes_after_scrub": retained_minutes,
+                    "repetition_time": repetition_time,
+                }
+            )
 
-    print(f"Wrote clean-sample decision table to {decisions_output}")
-    print(f"Wrote {len(included)} included subjects to {output_path}")
+    decision_fieldnames = list(decisions[0].keys()) if decisions else []
+    included_fieldnames = list(included[0].keys()) if included else []
+
+    write_rows(output_path, included_fieldnames, included)
+    write_rows(decisions_output, decision_fieldnames, decisions)
+
+    print(f"Wrote QC-pass sample with {len(included)} subjects to {output_path}")
+    print(f"Wrote decision log for {len(decisions)} candidates to {decisions_output}")
 
 
 if __name__ == "__main__":

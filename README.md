@@ -218,8 +218,4 @@ That is the sample that should be treated as primary in the write-up.
 
 ## Notes
 
-More detailed notes are in:
-
-- [docs/preprocessing_notes.md](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/docs/preprocessing_notes.md)
-- [docs/analysis_notebook_notes.md](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/docs/analysis_notebook_notes.md)
-- [docs/dissertation_figure_table_notes.md](/Users/lenkaokasova/Documents/GitHub/Dissertation-fMRI-Aging/fMRI-Network-Segregation-Aging/docs/dissertation_figure_table_notes.md)
+Working notes used during analysis and dissertation drafting are kept in `docs/`.

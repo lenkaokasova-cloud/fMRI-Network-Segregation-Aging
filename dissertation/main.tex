@@ -1,0 +1,99 @@
+\documentclass[12pt,oneside,openany]{report}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{newtxtext}
+\usepackage{newtxmath}
+\usepackage{microtype}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage[numbers]{natbib}
+
+\definecolor{universityblue}{RGB}{39,61,148}
+
+\newcommand{\dissertationtitle}{Resting-State fMRI Network Segregation in Ageing}
+\newcommand{\dissertationauthor}{Lenka Okasova}
+\newcommand{\dissertationstudentid}{20797508}
+\newcommand{\dissertationdegree}{MSc Computational Neuroscience, Cognition and AI}
+\newcommand{\dissertationdepartment}{Department of Psychology}
+\newcommand{\dissertationuniversity}{University to be added}
+\newcommand{\dissertationsupervisor}{Dr Martin Sch\"urmann}
+\newcommand{\dissertationfulfillment}{In partial fulfilment of the requirements for the degree listed below}
+\newcommand{\dissertationwordcount}{Word count to be added}
+\newcommand{\dissertationsubmissiondate}{Submission date to be added}
+\newcommand{\dissertationacademicyear}{2025/2026}
+\newcommand{\dissertationlogo}{figures/university_logo.png}
+
+\onehalfspacing
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{2}
+\setlength{\headheight}{15pt}
+
+\titleformat{\chapter}[display]
+  {\normalfont\bfseries\Large}
+  {\chaptertitlename\ \thechapter}
+  {0.5em}
+  {\Huge}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\nouppercase{\leftmark}}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \fancyhead[R]{\thepage}
+  \renewcommand{\headrulewidth}{0pt}
+}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue,
+    pdftitle={\dissertationtitle},
+    pdfauthor={\dissertationauthor}
+}
+
+\begin{document}
+
+\hypersetup{pageanchor=false}
+\include{frontmatter/titlepage}
+\clearpage
+\hypersetup{pageanchor=true}
+\pagenumbering{roman}
+\setcounter{page}{1}
+\include{chapters/abstract}
+\tableofcontents
+\clearpage
+\listoffigures
+\clearpage
+\listoftables
+\clearpage
+
+\pagenumbering{arabic}
+\include{chapters/introduction}
+\include{chapters/methods}
+\include{chapters/results}
+\include{chapters/discussion}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\appendix
+\include{appendices/appendix_a}
+\include{appendices/appendix_b}
+
+\end{document}

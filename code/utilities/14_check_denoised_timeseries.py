@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
 os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve()))
@@ -24,21 +25,29 @@ import pandas as pd
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-FIG_DPI = 300
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from dissertation_figure_style import (
+    FIG_DPI,
+    GRID_COLOR,
+    SUMMARY_AXIS_LABEL_SIZE,
+    SUMMARY_TICK_LABEL_SIZE,
+    SUMMARY_TITLE_SIZE,
+    apply_dissertation_rcparams,
+    darken_axis_text,
+    style_colorbar,
+    style_spines,
+)
+
 TITLE_SIZE = 14
 LABEL_SIZE = 12
 TICK_SIZE = 10
-GRID_COLOR = "#B8BDC7"
 
-plt.rcParams.update(
-    {
-        "font.size": TICK_SIZE,
-        "axes.titlesize": TITLE_SIZE,
-        "axes.labelsize": LABEL_SIZE,
-        "xtick.labelsize": TICK_SIZE,
-        "ytick.labelsize": TICK_SIZE,
-        "figure.titlesize": TITLE_SIZE,
-    }
+apply_dissertation_rcparams(
+    title_size=TITLE_SIZE,
+    label_size=LABEL_SIZE,
+    tick_size=TICK_SIZE,
 )
 
 
@@ -138,8 +147,14 @@ def make_subject_figure(
     axes[0].set_xlabel("Retained volume")
     axes[0].set_ylabel("Signal")
     axes[0].grid(color=GRID_COLOR, alpha=0.28, linewidth=0.9)
-    axes[0].spines["top"].set_visible(False)
-    axes[0].spines["right"].set_visible(False)
+    style_spines(axes[0])
+    darken_axis_text(axes[0])
+    axes[0].xaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    axes[0].yaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    axes[0].title.set_fontsize(SUMMARY_TITLE_SIZE)
+    axes[0].title.set_fontweight("bold")
+    for label in axes[0].get_xticklabels() + axes[0].get_yticklabels():
+        label.set_fontsize(SUMMARY_TICK_LABEL_SIZE)
 
     heatmap = axes[1].imshow(
         time_series.T,
@@ -151,10 +166,16 @@ def make_subject_figure(
     axes[1].set_title(f"{subject}: all parcel time series")
     axes[1].set_xlabel("Retained volume")
     axes[1].set_ylabel("Parcel")
-    axes[1].spines["top"].set_visible(False)
-    axes[1].spines["right"].set_visible(False)
+    style_spines(axes[1])
+    darken_axis_text(axes[1])
+    axes[1].xaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    axes[1].yaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    axes[1].title.set_fontsize(SUMMARY_TITLE_SIZE)
+    axes[1].title.set_fontweight("bold")
+    for label in axes[1].get_xticklabels() + axes[1].get_yticklabels():
+        label.set_fontsize(SUMMARY_TICK_LABEL_SIZE)
     colorbar = fig.colorbar(heatmap, ax=axes[1], shrink=0.9)
-    colorbar.outline.set_linewidth(0.8)
+    style_colorbar(colorbar)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=FIG_DPI, bbox_inches="tight", facecolor="white")

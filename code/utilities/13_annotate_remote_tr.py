@@ -14,14 +14,13 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import subprocess
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-OPENNEURO_PYTHON = Path(
-    "/Library/Frameworks/Python.framework/Versions/3.9/bin/python3"
-)
+OPENNEURO_PYTHON = os.environ.get("OPENNEURO_PYTHON", "python3")
 
 
 def parse_args() -> argparse.Namespace:
@@ -89,7 +88,6 @@ def write_rows(path: Path, fieldnames: list[str], rows: list[dict[str, object]])
 
 
 def query_remote_tr(dataset: str, subjects: list[str]) -> dict[str, dict[str, object]]:
-    # I ask the remote JSONs for TR here so I can screen protocol differences before full download.
     code = f"""
 import json
 import requests
@@ -140,160 +138,97 @@ for subject in subjects:
             check_snapshot=False,
         )
 
-        forward_jsons = []
-        for file in d._iterate_filenames(
-            meta["files"],
-            dataset_id=dataset,
-            tag=tag,
-            max_retries=5,
-            include=[],
-        ):
-            filename = file["filename"]
-            if (
-                (filename.startswith("func/") or "/func/" in filename)
-                and "task-rest" in filename
-                and "dir-forward" in filename
-                and filename.endswith("_bold.json")
-            ):
-                forward_jsons.append(file)
+        stack = list(meta.get("files", []))
+        forward_json_urls = []
+        while stack:
+            item = stack.pop()
+            if item.get("directory"):
+                stack.extend(item.get("files", []))
+            else:
+                filename = item.get("filename", "")
+                if "/func/" in filename and "task-rest" in filename and "dir-forward" in filename and filename.endswith(".json"):
+                    forward_json_urls.append(item.get("urls", [""])[0])
 
-        result["n_forward_jsons"] = len(forward_jsons)
-        result["protocol_hint"] = detect_protocol_hint(len(forward_jsons))
+        result["n_forward_jsons"] = len(forward_json_urls)
+        result["protocol_hint"] = detect_protocol_hint(len(forward_json_urls))
 
         tr_values = []
-        for file in forward_jsons:
-            response = session.get(file["urls"][0], timeout=60)
-            response.raise_for_status()
-            payload = response.json()
-            value = payload.get("RepetitionTime")
-            if value is None:
+        for url in forward_json_urls:
+            if not url:
                 continue
-            tr_values.append(float(value))
+            response = session.get(url, timeout=60)
+            response.raise_for_status()
+            metadata = response.json()
+            tr = metadata.get("RepetitionTime")
+            if tr is not None:
+                tr_values.append(float(tr))
 
-        # I keep all unique TR values so I can spot inconsistent protocol metadata early.
-        unique_trs = sorted(set(tr_values))
-        result["unique_tr_values"] = ",".join(f"{{value:g}}" for value in unique_trs)
-        if len(unique_trs) == 1:
-            result["tr_seconds"] = f"{{unique_trs[0]:g}}"
-        elif len(unique_trs) > 1:
-            result["tr_seconds"] = "inconsistent"
+        unique = sorted(set(tr_values))
+        result["unique_tr_values"] = ",".join(str(value) for value in unique)
+        result["tr_seconds"] = unique[0] if len(unique) == 1 else ""
     except Exception as exc:
         result["query_failed"] = 1
-        result["query_error"] = str(exc).replace("\\t", " ").replace("\\n", " ")
+        result["query_error"] = str(exc)
 
-    print(
-        "\\t".join(
-            str(result[key]) for key in (
-                "subject_id",
-                "tr_seconds",
-                "unique_tr_values",
-                "n_forward_jsons",
-                "protocol_hint",
-                "query_failed",
-                "query_error",
-            )
-        )
-    )
+    print(json.dumps(result))
 """
-
-    proc = subprocess.run(
+    completed = subprocess.run(
         [str(OPENNEURO_PYTHON), "-c", code],
         capture_output=True,
         text=True,
-        check=False,
+        check=True,
     )
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or "TR query failed")
-
-    results: dict[str, dict[str, object]] = {}
-    for line in proc.stdout.splitlines():
-        if not line or line.startswith(("👋", "👉", "🌍", "📁", "🍪")):
+    results = {}
+    for line in completed.stdout.splitlines():
+        line = line.strip()
+        if not line:
             continue
-        parts = line.split("\t")
-        if len(parts) != 7:
-            continue
-        (
-            subject_id,
-            tr_seconds,
-            unique_tr_values,
-            n_forward_jsons,
-            protocol_hint,
-            query_failed,
-            query_error,
-        ) = parts
-        results[subject_id] = {
-            "tr_seconds": tr_seconds,
-            "unique_tr_values": unique_tr_values,
-            "n_forward_jsons": int(n_forward_jsons),
-            "protocol_hint": protocol_hint,
-            "tr_query_failed": int(query_failed),
-            "tr_query_error": query_error,
-        }
-
-    missing = sorted(set(subjects).difference(results))
-    if missing:
-        raise RuntimeError(
-            "No TR metadata row parsed for: " + ", ".join(missing)
-        )
+        row = json.loads(line)
+        results[row["subject_id"]] = row
     return results
-
-
-def annotate_rows(
-    rows: list[dict[str, str]],
-    key: str,
-    tr_results: dict[str, dict[str, object]],
-) -> list[dict[str, object]]:
-    annotated: list[dict[str, object]] = []
-    for row in rows:
-        subject = row[key]
-        out = dict(row)
-        out.update(tr_results[subject])
-        annotated.append(out)
-    return annotated
 
 
 def main() -> None:
     args = parse_args()
     input_path = resolve_project_path(args.input)
-    output_path = (
-        resolve_project_path(args.output)
-        if args.output
-        else default_output_path(input_path)
-    )
-
+    output_path = resolve_project_path(args.output) if args.output else default_output_path(input_path)
     fieldnames, rows, key = load_rows(input_path)
     subjects = [row[key] for row in rows]
-    # This keeps the TR annotation tied to the exact subject list that came from the TSV.
-    tr_results = query_remote_tr(args.dataset, subjects)
+    query_results = query_remote_tr(args.dataset, subjects)
 
-    failures = sorted(
-        subject for subject, result in tr_results.items() if int(result["tr_query_failed"]) == 1
-    )
-    if failures and not args.allow_partial_results:
+    missing = [subject for subject in subjects if query_results.get(subject, {}).get("query_failed") == 1]
+    if missing and not args.allow_partial_results:
         raise RuntimeError(
-            "TR query failed for: "
-            + ", ".join(failures)
-            + ". Re-run with --allow-partial-results if you still want an output TSV."
+            "TR annotation failed for one or more subjects. Re-run with "
+            "--allow-partial-results to write the partial table."
         )
 
-    annotated_rows = annotate_rows(rows, key, tr_results)
-    extra_fields = [
+    output_fieldnames = fieldnames + [
         "tr_seconds",
         "unique_tr_values",
         "n_forward_jsons",
         "protocol_hint",
-        "tr_query_failed",
-        "tr_query_error",
+        "query_failed",
+        "query_error",
     ]
-    output_fields = fieldnames + [field for field in extra_fields if field not in fieldnames]
-    write_rows(output_path, output_fields, annotated_rows)
+    output_rows = []
+    for row in rows:
+        subject = row[key]
+        query = query_results.get(subject, {})
+        output_rows.append(
+            {
+                **row,
+                "tr_seconds": query.get("tr_seconds", ""),
+                "unique_tr_values": query.get("unique_tr_values", ""),
+                "n_forward_jsons": query.get("n_forward_jsons", ""),
+                "protocol_hint": query.get("protocol_hint", ""),
+                "query_failed": query.get("query_failed", 0),
+                "query_error": query.get("query_error", ""),
+            }
+        )
 
-    print(f"Wrote TR-annotated TSV to {output_path}")
-    for tr_label in sorted(
-        {row["tr_seconds"] for row in annotated_rows if str(row["tr_seconds"]).strip()}
-    ):
-        count = sum(1 for row in annotated_rows if row["tr_seconds"] == tr_label)
-        print(f"TR {tr_label}: {count} subjects")
+    write_rows(output_path, output_fieldnames, output_rows)
+    print(f"Wrote TR-annotated table to {output_path}")
 
 
 if __name__ == "__main__":

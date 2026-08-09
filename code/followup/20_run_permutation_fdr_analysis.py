@@ -34,19 +34,46 @@ COMPONENT_LABELS = {
     "between_mean_z": "Between",
     SEGREGATION_COL: "Segregation",
 }
-TITLE_SIZE = 15
-LABEL_SIZE = 12
-TICK_SIZE = 11
+Z_975 = 1.959963984540054
+TITLE_SIZE = 14
+LABEL_SIZE = 11
+TICK_SIZE = 10
 FIG_DPI = 300
+TEXT_COLOR = "#253547"
+AXIS_TEXT_COLOR = "#18222D"
+SUMMARY_AXIS_LABEL_SIZE = 12.5
+SUMMARY_TICK_LABEL_SIZE = 11.5
+SUMMARY_TITLE_SIZE = 15
+ANNOTATION_SIZE = 10.8
+FONT_FAMILY = "serif"
+FONT_SERIF = [
+    "Times New Roman",
+    "Times",
+    "Nimbus Roman",
+    "TeX Gyre Termes",
+    "STIX Two Text",
+    "Liberation Serif",
+    "DejaVu Serif",
+]
 
 plt.rcParams.update(
     {
+        "font.family": FONT_FAMILY,
+        "font.serif": FONT_SERIF,
         "font.size": TICK_SIZE,
         "axes.titlesize": TITLE_SIZE,
         "axes.labelsize": LABEL_SIZE,
         "xtick.labelsize": TICK_SIZE,
         "ytick.labelsize": TICK_SIZE,
         "figure.titlesize": TITLE_SIZE,
+        "axes.titleweight": "semibold",
+        "axes.labelcolor": TEXT_COLOR,
+        "axes.edgecolor": TEXT_COLOR,
+        "axes.linewidth": 0.9,
+        "text.color": TEXT_COLOR,
+        "xtick.color": TEXT_COLOR,
+        "ytick.color": TEXT_COLOR,
+        "mathtext.fontset": "stix",
     }
 )
 
@@ -100,6 +127,19 @@ def save_figure(fig: plt.Figure, outpath: Path) -> None:
     fig.tight_layout()
     fig.savefig(outpath, dpi=FIG_DPI, bbox_inches="tight", facecolor="white")
     plt.close(fig)
+
+
+def emphasize_summary_axis(ax: plt.Axes) -> None:
+    ax.xaxis.label.set_color(AXIS_TEXT_COLOR)
+    ax.yaxis.label.set_color(AXIS_TEXT_COLOR)
+    ax.xaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    ax.yaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    ax.title.set_fontsize(SUMMARY_TITLE_SIZE)
+    ax.title.set_fontweight("bold")
+    ax.tick_params(axis="both", labelcolor=AXIS_TEXT_COLOR, length=4.2, width=0.8, color=TEXT_COLOR)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_color(AXIS_TEXT_COLOR)
+        label.set_fontsize(SUMMARY_TICK_LABEL_SIZE)
 
 
 def fdr_bh(p_values: np.ndarray) -> np.ndarray:
@@ -161,6 +201,26 @@ def ols_term_stats(y: np.ndarray, x: np.ndarray, term_index: int = 1) -> tuple[n
     se = np.sqrt(sigma2 * xtx_inv[term_index, term_index])
     t_values = beta[term_index, :] / se
     return beta[term_index, :], se, t_values
+
+
+def hc3_term_interval(y: np.ndarray, x: np.ndarray, term_index: int = 1) -> dict[str, float]:
+    # This mirrors the main script's robust-HC3 uncertainty, while the p values still come from permutation.
+    xtx_inv = np.linalg.inv(x.T @ x)
+    beta = xtx_inv @ x.T @ y
+    residuals = y - x @ beta
+    hat_diag = np.sum(x * (x @ xtx_inv), axis=1)
+    denom = np.clip(1.0 - hat_diag, 1e-12, None)
+    omega = (residuals / denom) ** 2
+    meat = x.T @ (omega[:, None] * x)
+    cov_hc3 = xtx_inv @ meat @ xtx_inv
+    se = np.sqrt(np.diag(cov_hc3))
+    estimate = float(beta[term_index])
+    se_term = float(se[term_index])
+    return {
+        "std_error": se_term,
+        "conf_low": estimate - Z_975 * se_term,
+        "conf_high": estimate + Z_975 * se_term,
+    }
 
 
 def freedman_lane_pvalues(
@@ -286,14 +346,15 @@ def run_overall_permutation_analysis(
 
     rows: list[dict[str, object]] = []
     for idx, (column, label) in enumerate(outcomes):
+        robust_stats = hc3_term_interval(merged[column].to_numpy(dtype=float), x_full)
         rows.append(
             {
                 "outcome": column,
                 "label": label,
                 "estimate_older_vs_young": float(beta[idx]),
-                "std_error": float(se[idx]),
-                "conf_low": float(beta[idx] - 1.96 * se[idx]),
-                "conf_high": float(beta[idx] + 1.96 * se[idx]),
+                "std_error": robust_stats["std_error"],
+                "conf_low": robust_stats["conf_low"],
+                "conf_high": robust_stats["conf_high"],
                 "permutation_p_value": float(perm_p[idx]),
                 "fdr_q_value": float(q_values[idx]),
                 "young_mean": float(merged.loc[merged["age_group"] == "young", column].mean()),
@@ -301,10 +362,11 @@ def run_overall_permutation_analysis(
                 "older_minus_young_mean": float(
                     merged.loc[merged["age_group"] == "older", column].mean()
                     - merged.loc[merged["age_group"] == "young", column].mean()
-                ),
-                "n_subjects": int(len(merged)),
-            }
-        )
+                    ),
+                    "n_subjects": int(len(merged)),
+                    "ci_method": "HC3 model-based",
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -342,14 +404,15 @@ def run_network_permutation_analysis(
         q_values = fdr_bh(perm_p)
 
         for idx, network in enumerate(outcome_columns):
+            robust_stats = hc3_term_interval(wide[network].to_numpy(dtype=float), x_full)
             rows.append(
                 {
                     "component": component,
                     "network": network,
                     "estimate_older_vs_young": float(beta[idx]),
-                    "std_error": float(se[idx]),
-                    "conf_low": float(beta[idx] - 1.96 * se[idx]),
-                    "conf_high": float(beta[idx] + 1.96 * se[idx]),
+                    "std_error": robust_stats["std_error"],
+                    "conf_low": robust_stats["conf_low"],
+                    "conf_high": robust_stats["conf_high"],
                     "permutation_p_value": float(perm_p[idx]),
                     "fdr_q_value": float(q_values[idx]),
                     "young_mean": float(wide.loc[wide["age_group"] == "young", network].mean()),
@@ -359,6 +422,7 @@ def run_network_permutation_analysis(
                         - wide.loc[wide["age_group"] == "young", network].mean()
                     ),
                     "n_subjects": int(len(wide)),
+                    "ci_method": "HC3 model-based",
                 }
             )
 
@@ -392,14 +456,15 @@ def run_interaction_difference_analysis(
 
     rows: list[dict[str, object]] = []
     for idx, (column, label) in enumerate(outcomes):
+        robust_stats = hc3_term_interval(interaction_df[column].to_numpy(dtype=float), x_full)
         rows.append(
             {
                 "outcome": column,
                 "label": label,
                 "estimate_older_vs_young": float(beta[idx]),
-                "std_error": float(se[idx]),
-                "conf_low": float(beta[idx] - 1.96 * se[idx]),
-                "conf_high": float(beta[idx] + 1.96 * se[idx]),
+                "std_error": robust_stats["std_error"],
+                "conf_low": robust_stats["conf_low"],
+                "conf_high": robust_stats["conf_high"],
                 "permutation_p_value": float(perm_p[idx]),
                 "fdr_q_value": float(q_values[idx]),
                 "young_mean": float(interaction_df.loc[interaction_df["age_group"] == "young", column].mean()),
@@ -409,6 +474,7 @@ def run_interaction_difference_analysis(
                     - interaction_df.loc[interaction_df["age_group"] == "young", column].mean()
                 ),
                 "n_subjects": int(len(interaction_df)),
+                "ci_method": "HC3 model-based",
             }
         )
     return pd.DataFrame(rows)
@@ -434,6 +500,11 @@ def plot_network_qvalue_heatmap(network_results: pd.DataFrame, outpath: Path) ->
     ax.set_title("Permutation-FDR network summary")
     ax.set_xlabel("Network")
     ax.set_ylabel("Component")
+    emphasize_summary_axis(ax)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color(TEXT_COLOR)
+    ax.spines["bottom"].set_color(TEXT_COLOR)
 
     for row_idx, component in enumerate(pivot_q.index):
         for col_idx, network in enumerate(pivot_q.columns):
@@ -444,12 +515,15 @@ def plot_network_qvalue_heatmap(network_results: pd.DataFrame, outpath: Path) ->
                 f"{q_value:.2f}",
                 ha="center",
                 va="center",
-                color="black",
-                fontsize=9,
+                color=AXIS_TEXT_COLOR,
+                fontsize=ANNOTATION_SIZE,
             )
 
     cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label("Signed -log10(q)")
+    cbar.set_label("Signed -log10(q)", fontsize=SUMMARY_AXIS_LABEL_SIZE, color=AXIS_TEXT_COLOR)
+    cbar.ax.tick_params(labelsize=SUMMARY_TICK_LABEL_SIZE, colors=AXIS_TEXT_COLOR)
+    cbar.outline.set_edgecolor(TEXT_COLOR)
+    cbar.outline.set_linewidth(0.9)
     save_figure(fig, outpath)
 
 

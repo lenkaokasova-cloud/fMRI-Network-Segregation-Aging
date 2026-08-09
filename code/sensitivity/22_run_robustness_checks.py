@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
 os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve()))
@@ -24,12 +25,26 @@ import statsmodels.formula.api as smf
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from dissertation_figure_style import (
+    AXIS_TEXT_COLOR,
+    FIG_DPI,
+    GRID_COLOR,
+    MUTED_REFERENCE_LINE_COLOR,
+    OLDER_COLOR,
+    SUMMARY_AXIS_LABEL_SIZE,
+    SUMMARY_TICK_LABEL_SIZE,
+    SUMMARY_TITLE_SIZE,
+    YOUNG_COLOR,
+    apply_dissertation_rcparams,
+    darken_axis_text,
+    save_figure as save_dissertation_figure,
+    style_spines,
+)
+
 NETWORK_ORDER = ["Vis", "SomMot", "DorsAttn", "SalVentAttn", "Limbic", "Cont", "Default"]
-YOUNG_COLOR = "#4C78A8"
-OLDER_COLOR = "#D16A3A"
-REFERENCE_LINE_COLOR = "#1F3A5F"
-GRID_COLOR = "#B8BDC7"
-FIG_DPI = 300
 TITLE_SIZE = 15
 LABEL_SIZE = 12
 TICK_SIZE = 11
@@ -45,15 +60,10 @@ NETWORK_METRICS = {
     "segregation_prop_posonly": "Positive-only proportional segregation",
 }
 
-plt.rcParams.update(
-    {
-        "font.size": TICK_SIZE,
-        "axes.titlesize": TITLE_SIZE,
-        "axes.labelsize": LABEL_SIZE,
-        "xtick.labelsize": TICK_SIZE,
-        "ytick.labelsize": TICK_SIZE,
-        "figure.titlesize": TITLE_SIZE,
-    }
+apply_dissertation_rcparams(
+    title_size=TITLE_SIZE,
+    label_size=LABEL_SIZE,
+    tick_size=TICK_SIZE,
 )
 
 
@@ -121,18 +131,21 @@ def style_axis(
         ax.set_xlabel(xlabel)
     if ylabel:
         ax.set_ylabel(ylabel)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
+    style_spines(ax)
+    darken_axis_text(ax)
+    ax.xaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    ax.yaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
+    ax.title.set_fontsize(SUMMARY_TITLE_SIZE)
+    ax.title.set_fontweight("bold")
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontsize(SUMMARY_TICK_LABEL_SIZE)
     ax.tick_params(axis="x", labelrotation=xrotation)
     for label in ax.get_xticklabels():
         label.set_ha("right" if xrotation else "center")
 
 
 def save_figure(fig: plt.Figure, outpath: Path) -> None:
-    outpath.parent.mkdir(parents=True, exist_ok=True)
-    fig.tight_layout()
-    fig.savefig(outpath, dpi=FIG_DPI, bbox_inches="tight", facecolor="white")
-    plt.close(fig)
+    save_dissertation_figure(fig, outpath, dpi=FIG_DPI)
 
 
 def load_tables(sample_path: Path, connectivity_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -292,7 +305,7 @@ def run_retained_minutes_covariate_sensitivity(global_df: pd.DataFrame, outcome:
 def plot_global_metric_sensitivity(results: pd.DataFrame, outpath: Path) -> None:
     fig, ax = plt.subplots(figsize=(7.8, 4.8))
     y_pos = np.arange(len(results))[::-1]
-    ax.axvline(0.0, color=REFERENCE_LINE_COLOR, linewidth=1.6, linestyle="--")
+    ax.axvline(0.0, color=MUTED_REFERENCE_LINE_COLOR, linewidth=1.6, linestyle="--")
     ax.errorbar(
         results["estimate_older_vs_young"],
         y_pos,
@@ -322,7 +335,7 @@ def plot_leave_one_out(results: pd.DataFrame, outpath: Path) -> None:
     fig, ax = plt.subplots(figsize=(8.8, 4.8))
     order = results["left_out_older_subject"].tolist()
     x_pos = np.arange(len(order))
-    ax.axhline(0.0, color=REFERENCE_LINE_COLOR, linewidth=1.6, linestyle="--")
+    ax.axhline(0.0, color=MUTED_REFERENCE_LINE_COLOR, linewidth=1.6, linestyle="--")
     ax.errorbar(
         x_pos,
         results["estimate_older_vs_young"],
