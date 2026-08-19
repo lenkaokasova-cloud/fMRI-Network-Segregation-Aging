@@ -226,8 +226,8 @@ def draw_flow_box(ax: plt.Axes, x: float, y: float, width: float, height: float,
         alpha=0.18,
     )
     ax.add_patch(patch)
-    ax.text(x + width / 2, y + height * 0.68, title, ha="center", va="center", fontsize=11.6, weight="semibold")
-    ax.text(x + width / 2, y + height * 0.34, text, ha="center", va="center", fontsize=10.8)
+    ax.text(x + width / 2, y + height * 0.68, title, ha="center", va="center", fontsize=16.5, weight="semibold", color="#081A2D")
+    ax.text(x + width / 2, y + height * 0.34, text, ha="center", va="center", fontsize=15.5, color="#081A2D")
 
 
 def plot_sample_flow(screening_dir: Path, outpath: Path) -> None:
@@ -249,13 +249,15 @@ def plot_sample_flow(screening_dir: Path, outpath: Path) -> None:
         "older_final": int((final_sample["age_group"] == "older").sum()),
     }
 
-    fig, ax = plt.subplots(figsize=(11.1, 6.5))
+    fig, ax = plt.subplots(figsize=(12.8, 6.8))
     ax.axis("off")
-    ax.set_title("Sample selection flow", pad=16, fontsize=16)
+    flow_young_text = "#123B63"
+    flow_older_text = "#7B2E1F"
+    ax.set_title("Sample selection flow", pad=16, fontsize=21, color="#081A2D")
 
     y_positions = [0.78, 0.54, 0.30, 0.06]
-    left_x = 0.10
-    right_x = 0.55
+    left_x = 0.05
+    right_x = 0.65
     width = 0.30
     height = 0.14
 
@@ -265,21 +267,59 @@ def plot_sample_flow(screening_dir: Path, outpath: Path) -> None:
         ("QC-pass preprocessed sample", f"{counts['young_qc_pass']} young\n{counts['older_qc_pass']} older"),
         ("Primary final TR = 3 s sample", f"{counts['young_final']} young\n{counts['older_final']} older"),
     ]
+    exclusions = [
+        ("Missing\nscans", counts["young_age_band"] - counts["young_remote"], counts["older_age_band"] - counts["older_remote"]),
+        ("Preprocessing +\nQC exclusions", counts["young_remote"] - counts["young_qc_pass"], counts["older_remote"] - counts["older_qc_pass"]),
+        ("TR ≠ 3 s\nexclusions", counts["young_qc_pass"] - counts["young_final"], counts["older_qc_pass"] - counts["older_final"]),
+    ]
 
     for idx, (title, text) in enumerate(steps):
         draw_flow_box(ax, left_x, y_positions[idx], width, height, title, text.split("\n")[0], YOUNG_COLOR)
         draw_flow_box(ax, right_x, y_positions[idx], width, height, title, text.split("\n")[1], OLDER_COLOR)
         if idx < len(steps) - 1:
+            exclusion_title, young_excluded, older_excluded = exclusions[idx]
+            arrow_top = y_positions[idx] - 0.01
+            arrow_bottom = y_positions[idx + 1] + height + 0.01
+            arrow_midpoint = (arrow_top + arrow_bottom) / 2
             for x_center in (left_x + width / 2, right_x + width / 2):
                 ax.annotate(
                     "",
-                    xy=(x_center, y_positions[idx + 1] + height + 0.01),
-                    xytext=(x_center, y_positions[idx] - 0.01),
+                    xy=(x_center, arrow_bottom),
+                    xytext=(x_center, arrow_top),
                     arrowprops={"arrowstyle": "->", "linewidth": 1.4, "color": REFERENCE_LINE_COLOR},
                 )
+            ax.text(
+                0.50,
+                arrow_midpoint,
+                exclusion_title,
+                ha="center",
+                va="center",
+                fontsize=13.5,
+                color=REFERENCE_LINE_COLOR,
+            )
+            ax.text(
+                0.43,
+                arrow_midpoint,
+                f"n = {young_excluded}",
+                ha="right",
+                va="center",
+                fontsize=15.0,
+                weight="semibold",
+                color=flow_young_text,
+            )
+            ax.text(
+                0.57,
+                arrow_midpoint,
+                f"n = {older_excluded}",
+                ha="left",
+                va="center",
+                fontsize=15.0,
+                weight="semibold",
+                color=flow_older_text,
+            )
 
-    ax.text(left_x + width / 2, 0.97, "Younger branch", ha="center", va="center", fontsize=12.8, weight="semibold", color=YOUNG_COLOR)
-    ax.text(right_x + width / 2, 0.97, "Older branch", ha="center", va="center", fontsize=12.8, weight="semibold", color=OLDER_COLOR)
+    ax.text(left_x + width / 2, 0.97, "Younger branch", ha="center", va="center", fontsize=18.5, weight="semibold", color=flow_young_text)
+    ax.text(right_x + width / 2, 0.97, "Older branch", ha="center", va="center", fontsize=18.5, weight="semibold", color=flow_older_text)
     save_figure(fig, outpath)
 
 

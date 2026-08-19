@@ -58,10 +58,10 @@ NETWORK_TYPE_LABELS = {
     "sensory_motor": "Sensory / motor",
     "higher_order": "Higher-order",
 }
-TITLE_SIZE = 15
-LABEL_SIZE = 12
-TICK_SIZE = 11
-LEGEND_SIZE = 11
+TITLE_SIZE = 20
+LABEL_SIZE = 16
+TICK_SIZE = 14
+LEGEND_SIZE = 14
 
 apply_dissertation_rcparams(
     title_size=TITLE_SIZE,
@@ -119,12 +119,12 @@ def style_axis(
         ax.set_ylabel(ylabel)
     style_spines(ax)
     darken_axis_text(ax)
-    ax.xaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
-    ax.yaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
-    ax.title.set_fontsize(SUMMARY_TITLE_SIZE)
+    ax.xaxis.label.set_fontsize(16)
+    ax.yaxis.label.set_fontsize(16)
+    ax.title.set_fontsize(20)
     ax.title.set_fontweight("bold")
     for label in ax.get_xticklabels() + ax.get_yticklabels():
-        label.set_fontsize(SUMMARY_TICK_LABEL_SIZE)
+        label.set_fontsize(14)
     ax.tick_params(axis="x", labelrotation=xrotation)
     for label in ax.get_xticklabels():
         label.set_ha("right" if xrotation else "center")
@@ -237,7 +237,7 @@ def build_effect_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def plot_component_panels(df: pd.DataFrame, outpath: Path) -> None:
-    fig, axes = plt.subplots(1, 3, figsize=(15.2, 4.8), sharex=False)
+    fig, axes = plt.subplots(1, 3, figsize=(15.6, 5.3), sharex=False)
     positions = {
         ("young", "sensory_motor"): 0.0,
         ("young", "higher_order"): 1.3,
@@ -323,7 +323,7 @@ def plot_component_panels(df: pd.DataFrame, outpath: Path) -> None:
         )
         ax.set_xticks(xticks)
         ax.set_xticklabels(xlabels)
-        ax.tick_params(axis="x", labelsize=10)
+        ax.tick_params(axis="x", labelsize=13)
         ax.grid(axis="y", color=GRID_COLOR, alpha=0.26, linewidth=0.9)
 
     save_figure(fig, outpath)

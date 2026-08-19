@@ -2,12 +2,12 @@
 
 # What this script does:
 #   Uses the younger group as the reference distribution and scores the older
-#   group relative to that younger normative range.
+#   group relative to the younger reference distribution.
 # How to run it:
 #   Run from the repo root with:
-#   python code/followup/17_run_normative_analysis.py
+#   python code/followup/17_run_younger_reference_deviation_analysis.py
 # Main output:
-#   data/processed/analysis/normative/
+#   data/processed/analysis/younger_reference_deviation/
 
 from __future__ import annotations
 
@@ -20,13 +20,14 @@ os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).r
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.patches import Rectangle
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 NETWORK_ORDER = ["Vis", "SomMot", "DorsAttn", "SalVentAttn", "Limbic", "Cont", "Default"]
 REFERENCE_GROUP = "young"
 COMPARISON_GROUP = "older"
-NORMATIVE_Z_THRESHOLD = 1.96
+YOUNGER_REFERENCE_Z_THRESHOLD = 1.96
 GLOBAL_SEGREGATION_COL = "global_segregation_prop"
 NETWORK_SEGREGATION_COL = "segregation_prop"
 YOUNG_COLOR = "#5E7FA6"
@@ -90,7 +91,7 @@ plt.rcParams.update(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run a normative resting-state analysis by using the younger TR=3 s sample "
+            "Calculate younger-reference deviations by using the younger TR=3 s sample "
             "as the reference distribution and scoring each older participant relative "
             "to that reference."
         )
@@ -115,13 +116,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-dir",
-        default="data/processed/analysis/normative",
-        help="Directory for normative-analysis tables, figures, and summary files.",
+        default="data/processed/analysis/younger_reference_deviation",
+        help="Directory for younger-reference deviation tables, figures, and summary files.",
     )
     parser.add_argument(
         "--reference-group",
         default=REFERENCE_GROUP,
-        help="Age-group label to use as the normative reference.",
+        help="Age-group label to use as the younger reference group.",
     )
     parser.add_argument(
         "--comparison-group",
@@ -131,7 +132,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--z-threshold",
         type=float,
-        default=NORMATIVE_Z_THRESHOLD,
+        default=YOUNGER_REFERENCE_Z_THRESHOLD,
         help="Absolute z-score threshold used to flag deviation from the reference range.",
     )
     return parser.parse_args()
@@ -301,7 +302,7 @@ def reference_distribution_table(
     return pd.DataFrame(rows)[columns]
 
 
-def add_normative_scores(
+def add_younger_reference_scores(
     df: pd.DataFrame,
     reference_table: pd.DataFrame,
     merge_columns: list[str],
@@ -398,8 +399,8 @@ def build_sample_summary(global_df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def build_network_summary(normative_network_df: pd.DataFrame, comparison_group: str) -> pd.DataFrame:
-    older = normative_network_df[normative_network_df["age_group"] == comparison_group].copy()
+def build_network_summary(younger_reference_network_df: pd.DataFrame, comparison_group: str) -> pd.DataFrame:
+    older = younger_reference_network_df[younger_reference_network_df["age_group"] == comparison_group].copy()
     rows: list[dict[str, object]] = []
     for network, subset in older.groupby("network", sort=False):
         rows.append(
@@ -430,8 +431,8 @@ def build_network_summary(normative_network_df: pd.DataFrame, comparison_group: 
     return out
 
 
-def build_global_summary(normative_global_df: pd.DataFrame, comparison_group: str) -> pd.DataFrame:
-    older = normative_global_df[normative_global_df["age_group"] == comparison_group].copy()
+def build_global_summary(younger_reference_global_df: pd.DataFrame, comparison_group: str) -> pd.DataFrame:
+    older = younger_reference_global_df[younger_reference_global_df["age_group"] == comparison_group].copy()
     if older.empty:
         raise ValueError(f"No subjects found in comparison group: {comparison_group}")
     return pd.DataFrame(
@@ -460,12 +461,12 @@ def build_global_summary(normative_global_df: pd.DataFrame, comparison_group: st
 
 
 def build_subject_summary(
-    normative_global_df: pd.DataFrame,
-    normative_network_df: pd.DataFrame,
+    younger_reference_global_df: pd.DataFrame,
+    younger_reference_network_df: pd.DataFrame,
     comparison_group: str,
 ) -> pd.DataFrame:
-    older_global = normative_global_df[normative_global_df["age_group"] == comparison_group].copy()
-    older_network = normative_network_df[normative_network_df["age_group"] == comparison_group].copy()
+    older_global = younger_reference_global_df[younger_reference_global_df["age_group"] == comparison_group].copy()
+    older_network = younger_reference_network_df[younger_reference_network_df["age_group"] == comparison_group].copy()
 
     rows: list[dict[str, object]] = []
     for subject, network_subset in older_network.groupby("subject_id", sort=False):
@@ -494,13 +495,13 @@ def build_subject_summary(
 
 
 def plot_global_reference(
-    normative_global_df: pd.DataFrame,
+    younger_reference_global_df: pd.DataFrame,
     reference_group: str,
     comparison_group: str,
     outpath: Path,
 ) -> None:
-    reference = normative_global_df[normative_global_df["age_group"] == reference_group].copy()
-    older = normative_global_df[normative_global_df["age_group"] == comparison_group].copy()
+    reference = younger_reference_global_df[younger_reference_global_df["age_group"] == reference_group].copy()
+    older = younger_reference_global_df[younger_reference_global_df["age_group"] == comparison_group].copy()
     ref_mean = float(reference["reference_mean"].iloc[0])
     ref_lower = float(reference["reference_z_lower"].iloc[0])
     ref_upper = float(reference["reference_z_upper"].iloc[0])
@@ -580,13 +581,13 @@ def plot_global_reference(
 
 
 def plot_global_distribution(
-    normative_global_df: pd.DataFrame,
+    younger_reference_global_df: pd.DataFrame,
     reference_group: str,
     comparison_group: str,
     outpath: Path,
 ) -> None:
-    reference = normative_global_df[normative_global_df["age_group"] == reference_group].copy()
-    older = normative_global_df[normative_global_df["age_group"] == comparison_group].copy()
+    reference = younger_reference_global_df[younger_reference_global_df["age_group"] == reference_group].copy()
+    older = younger_reference_global_df[younger_reference_global_df["age_group"] == comparison_group].copy()
     ref_mean = float(reference["reference_mean"].iloc[0])
     ref_lower = float(reference["reference_p025"].iloc[0])
     ref_upper = float(reference["reference_p975"].iloc[0])
@@ -666,8 +667,8 @@ def plot_network_mean_z(network_summary: pd.DataFrame, outpath: Path) -> None:
         linewidth=1.0,
     )
     ax.axhline(0.0, color=REFERENCE_LINE_COLOR, linewidth=1.35)
-    ax.axhline(-NORMATIVE_Z_THRESHOLD, color=SUBTLE_TEXT_COLOR, linestyle="--", linewidth=1.1)
-    ax.axhline(NORMATIVE_Z_THRESHOLD, color=SUBTLE_TEXT_COLOR, linestyle="--", linewidth=1.1)
+    ax.axhline(-YOUNGER_REFERENCE_Z_THRESHOLD, color=SUBTLE_TEXT_COLOR, linestyle="--", linewidth=1.1)
+    ax.axhline(YOUNGER_REFERENCE_Z_THRESHOLD, color=SUBTLE_TEXT_COLOR, linestyle="--", linewidth=1.1)
     style_axis(
         ax,
         title="Mean older deviation by network",
@@ -680,14 +681,14 @@ def plot_network_mean_z(network_summary: pd.DataFrame, outpath: Path) -> None:
 
 
 def plot_network_reference_ranges(
-    normative_network_df: pd.DataFrame,
+    younger_reference_network_df: pd.DataFrame,
     reference_group: str,
     comparison_group: str,
     outpath: Path,
 ) -> None:
-    reference = normative_network_df[normative_network_df["age_group"] == reference_group].copy()
-    older = normative_network_df[normative_network_df["age_group"] == comparison_group].copy()
-    network_order = ordered_networks(normative_network_df["network"].tolist())
+    reference = younger_reference_network_df[younger_reference_network_df["age_group"] == reference_group].copy()
+    older = younger_reference_network_df[younger_reference_network_df["age_group"] == comparison_group].copy()
+    network_order = ordered_networks(younger_reference_network_df["network"].tolist())
 
     fig, ax = plt.subplots(figsize=(9, 5.2))
     x_positions = np.arange(len(network_order))
@@ -780,26 +781,56 @@ def plot_out_of_range_burden(subject_summary: pd.DataFrame, outpath: Path) -> No
     save_figure(fig, outpath)
 
 
-def plot_older_network_heatmap(normative_network_df: pd.DataFrame, comparison_group: str, outpath: Path) -> None:
-    older = normative_network_df[normative_network_df["age_group"] == comparison_group].copy()
+def plot_older_network_heatmap(younger_reference_network_df: pd.DataFrame, comparison_group: str, outpath: Path) -> None:
+    older = younger_reference_network_df[younger_reference_network_df["age_group"] == comparison_group].copy()
     subject_order = older.groupby("subject_id")["abs_z_score"].mean().sort_values(ascending=False).index.tolist()
     network_order = ordered_networks(older["network"].tolist())
+    subject_ages = older.groupby("subject_id")["age"].first()
     heatmap_df = (
         older.pivot(index="subject_id", columns="network", values="z_score")
         .reindex(index=subject_order, columns=network_order)
     )
 
-    fig, ax = plt.subplots(figsize=(8, max(4.5, 0.35 * len(heatmap_df))))
+    fig, ax = plt.subplots(figsize=(9.3, max(5.3, 0.45 * len(heatmap_df))))
     im = ax.imshow(heatmap_df.to_numpy(), aspect="auto", cmap=HEATMAP_CMAP, vmin=-3, vmax=3)
     ax.set_xticks(np.arange(len(network_order)))
     ax.set_xticklabels(network_order, rotation=45, ha="right")
     ax.set_yticks(np.arange(len(subject_order)))
-    ax.set_yticklabels(subject_order)
+    ax.set_yticklabels([f"{subject} ({int(subject_ages.loc[subject])} y)" for subject in subject_order])
+
+    for row_idx, subject in enumerate(subject_order):
+        for column_idx, network in enumerate(network_order):
+            z_score = heatmap_df.loc[subject, network]
+            if pd.isna(z_score):
+                continue
+            text_color = "white" if abs(z_score) >= 1.35 else TEXT_COLOR
+            outside_reference_range = abs(z_score) > YOUNGER_REFERENCE_Z_THRESHOLD
+            ax.text(
+                column_idx,
+                row_idx,
+                f"{z_score:.2f}",
+                ha="center",
+                va="center",
+                fontsize=8.6,
+                color=text_color,
+                weight="semibold" if outside_reference_range else "normal",
+            )
+            if outside_reference_range:
+                ax.add_patch(
+                    Rectangle(
+                        (column_idx - 0.5, row_idx - 0.5),
+                        1,
+                        1,
+                        fill=False,
+                        edgecolor="#111111",
+                        linewidth=2.0,
+                    )
+                )
     style_axis(
         ax,
         title="Older Participant Network Deviation Profiles",
         xlabel="Network",
-        ylabel="Older participant",
+        ylabel="Older participant (age)",
         xrotation=45,
     )
     emphasize_summary_axis(ax)
@@ -835,7 +866,7 @@ def write_summary_markdown(
     ).head(3)
 
     lines = [
-        "# Normative Analysis Summary",
+        "# Younger-Reference Deviation Analysis Summary",
         "",
         "## Design",
         "",
@@ -847,7 +878,7 @@ def write_summary_markdown(
         ),
         "- Primary outcomes: one global segregation metric plus seven network-specific segregation metrics",
         "- Older participants were standardized relative to the younger reference mean and SD",
-        f"- Primary flag for deviation: |z| > {NORMATIVE_Z_THRESHOLD:.2f}",
+        f"- Primary flag for deviation: |z| > {YOUNGER_REFERENCE_Z_THRESHOLD:.2f}",
         "",
         "## Global Segregation",
         "",
@@ -944,14 +975,14 @@ def main() -> None:
     network_df = network_df.copy()
     network_df["metric"] = NETWORK_SEGREGATION_COL
 
-    normative_global = add_normative_scores(
+    younger_reference_global = add_younger_reference_scores(
         global_df,
         reference_global,
         merge_columns=["metric"],
         value_column=GLOBAL_SEGREGATION_COL,
         z_threshold=args.z_threshold,
     )
-    normative_network = add_normative_scores(
+    younger_reference_network = add_younger_reference_scores(
         network_df,
         reference_network,
         merge_columns=["network", "metric"],
@@ -959,26 +990,26 @@ def main() -> None:
         z_threshold=args.z_threshold,
     )
 
-    older_global = normative_global[normative_global["age_group"] == args.comparison_group].copy()
-    older_network = normative_network[normative_network["age_group"] == args.comparison_group].copy()
+    older_global = younger_reference_global[younger_reference_global["age_group"] == args.comparison_group].copy()
+    older_network = younger_reference_network[younger_reference_network["age_group"] == args.comparison_group].copy()
 
-    global_summary = build_global_summary(normative_global, args.comparison_group)
-    network_summary = build_network_summary(normative_network, args.comparison_group)
+    global_summary = build_global_summary(younger_reference_global, args.comparison_group)
+    network_summary = build_network_summary(younger_reference_network, args.comparison_group)
     subject_summary = build_subject_summary(
-        normative_global,
-        normative_network,
+        younger_reference_global,
+        younger_reference_network,
         args.comparison_group,
     )
 
     reference_global.to_csv(output_dir / "reference_global_distribution.tsv", sep="\t", index=False)
     reference_network.to_csv(output_dir / "reference_network_distribution.tsv", sep="\t", index=False)
-    normative_global.to_csv(output_dir / "all_subject_global_normative_scores.tsv", sep="\t", index=False)
-    normative_network.to_csv(output_dir / "all_subject_network_normative_scores.tsv", sep="\t", index=False)
-    older_global.to_csv(output_dir / "older_global_normative_scores.tsv", sep="\t", index=False)
-    older_network.to_csv(output_dir / "older_network_normative_scores.tsv", sep="\t", index=False)
-    global_summary.to_csv(output_dir / "global_normative_summary.tsv", sep="\t", index=False)
-    network_summary.to_csv(output_dir / "network_normative_summary.tsv", sep="\t", index=False)
-    subject_summary.to_csv(output_dir / "older_subject_normative_summary.tsv", sep="\t", index=False)
+    younger_reference_global.to_csv(output_dir / "all_subject_global_younger_reference_scores.tsv", sep="\t", index=False)
+    younger_reference_network.to_csv(output_dir / "all_subject_network_younger_reference_scores.tsv", sep="\t", index=False)
+    older_global.to_csv(output_dir / "older_global_younger_reference_scores.tsv", sep="\t", index=False)
+    older_network.to_csv(output_dir / "older_network_younger_reference_scores.tsv", sep="\t", index=False)
+    global_summary.to_csv(output_dir / "global_younger_reference_summary.tsv", sep="\t", index=False)
+    network_summary.to_csv(output_dir / "network_younger_reference_summary.tsv", sep="\t", index=False)
+    subject_summary.to_csv(output_dir / "older_subject_younger_reference_summary.tsv", sep="\t", index=False)
     sample_summary.to_csv(output_dir / "sample_summary.tsv", sep="\t", index=False)
     pd.DataFrame(
         [
@@ -992,23 +1023,23 @@ def main() -> None:
                 "primary_network_metric": NETWORK_SEGREGATION_COL,
             }
         ]
-    ).to_csv(output_dir / "normative_settings.tsv", sep="\t", index=False)
+    ).to_csv(output_dir / "younger_reference_settings.tsv", sep="\t", index=False)
 
     plot_global_reference(
-        normative_global,
+        younger_reference_global,
         args.reference_group,
         args.comparison_group,
-        figures_dir / "global_normative_reference.png",
+        figures_dir / "global_younger_reference_distribution.png",
     )
     plot_global_distribution(
-        normative_global,
+        younger_reference_global,
         args.reference_group,
         args.comparison_group,
         figures_dir / "global_segregation_distribution.png",
     )
     plot_network_mean_z(network_summary, figures_dir / "network_mean_older_z_score.png")
     plot_network_reference_ranges(
-        normative_network,
+        younger_reference_network,
         args.reference_group,
         args.comparison_group,
         figures_dir / "network_reference_ranges.png",
@@ -1021,12 +1052,12 @@ def main() -> None:
         figures_dir / "older_network_deviation_burden.png",
     )
     plot_older_network_heatmap(
-        normative_network,
+        younger_reference_network,
         args.comparison_group,
         figures_dir / "older_network_z_score_heatmap.png",
     )
     write_summary_markdown(
-        output_dir / "normative_analysis_summary.md",
+        output_dir / "younger_reference_deviation_analysis_summary.md",
         sample_summary,
         global_summary,
         network_summary,
@@ -1037,8 +1068,8 @@ def main() -> None:
 
     print(f"Reference group: {args.reference_group}")
     print(f"Comparison group: {args.comparison_group}")
-    print(f"Wrote normative-analysis tables to {output_dir}")
-    print(f"Wrote normative-analysis figures to {figures_dir}")
+    print(f"Wrote younger-reference deviation tables to {output_dir}")
+    print(f"Wrote younger-reference deviation figures to {figures_dir}")
 
 
 if __name__ == "__main__":

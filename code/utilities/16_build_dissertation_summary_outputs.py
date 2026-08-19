@@ -32,16 +32,16 @@ FIG_DPI = 300
 TITLE_SIZE = 14
 LABEL_SIZE = 11
 TICK_SIZE = 10
-TEXT_COLOR = "#223245"
+TEXT_COLOR = "#0A1724"
 SUBTLE_TEXT_COLOR = "#33485D"
-AXIS_TEXT_COLOR = "#18222D"
+AXIS_TEXT_COLOR = "#07131F"
 GRID_COLOR = "#D4DAE3"
 REFERENCE_LINE_COLOR = "#6A7D92"
 OVERALL_COLOR = "#355D4C"
 NETWORK_COLOR = "#7A9C8B"
 HIGHLIGHT_COLOR = "#5E7B5F"
-HEADLINE_AXIS_LABEL_SIZE = 12.5
-HEADLINE_TICK_LABEL_SIZE = 11.5
+HEADLINE_AXIS_LABEL_SIZE = 17.0
+HEADLINE_TICK_LABEL_SIZE = 16.0
 FONT_FAMILY = "serif"
 FONT_SERIF = [
     "Times New Roman",
@@ -365,7 +365,7 @@ def add_q_labels(ax: plt.Axes, values: np.ndarray, y_positions: np.ndarray, q_va
             f"q = {q:.3f}",
             va="center",
             ha="left",
-            fontsize=9.0,
+            fontsize=14.0,
             color=TEXT_COLOR,
         )
 
@@ -386,7 +386,7 @@ def enlarge_headline_axis_text(ax: plt.Axes) -> None:
 
 
 def emphasize_headline_title(ax: plt.Axes) -> None:
-    ax.title.set_fontsize(15)
+    ax.title.set_fontsize(21)
     ax.title.set_fontweight("bold")
 
 
@@ -402,7 +402,7 @@ def plot_headline_effects(overall_df: pd.DataFrame, network_df: pd.DataFrame, ou
     fig, axes = plt.subplots(
         1,
         2,
-        figsize=(10.6, 5.9),
+        figsize=(11.2, 6.3),
         gridspec_kw={"width_ratios": [1.0, 1.22]},
     )
 
@@ -480,7 +480,7 @@ def plot_headline_effects(overall_df: pd.DataFrame, network_df: pd.DataFrame, ou
         network["fdr_q_value"].to_numpy(dtype=float),
     )
 
-    fig.suptitle("Primary age effects", y=1.01, fontweight="bold")
+    fig.suptitle("Primary age effects", y=1.01, fontsize=23, fontweight="bold", color="#07131F")
     save_figure(fig, outpath)
 
 
@@ -644,7 +644,7 @@ def build_sensitivity_forest_table(
 
 
 def plot_sensitivity_forest(sensitivity_df: pd.DataFrame, outpath: Path) -> None:
-    fig, ax = plt.subplots(figsize=(9.4, 5.8))
+    fig, ax = plt.subplots(figsize=(10.6, 6.3))
 
     plot_df = sensitivity_df.copy().sort_values("display_order", ascending=True).reset_index(drop=True)
     y = np.arange(len(plot_df))[::-1]
@@ -684,17 +684,13 @@ def plot_sensitivity_forest(sensitivity_df: pd.DataFrame, outpath: Path) -> None
     max_high = float(np.nanmax(finite_high)) if len(finite_high) else 0.0
     x_text = max_high + 0.012
     for idx, row in plot_df.iterrows():
-        extra = row["n_label"]
-        q = row["permutation_q"]
-        if pd.notna(q):
-            extra = f"{extra}\nq={float(q):.3f}"
         ax.text(
             x_text,
             y[idx],
-            extra,
+            row["n_label"],
             va="center",
             ha="left",
-            fontsize=8.8,
+            fontsize=13.0,
             color=TEXT_COLOR,
             linespacing=1.1,
         )

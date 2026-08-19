@@ -24,8 +24,6 @@ The current preprocessing branch is basically in line with:
 - study-specific denoising done later rather than inside `fMRIPrep`
 - a motion + `aCompCor` nuisance model without making global signal regression the default (`Behzadi et al., 2007`; `Muschelli et al., 2014`; `Murphy and Fox, 2017`)
 
-So overall this is a pretty standard resting-state fMRI pipeline. Nothing especially odd there.
-
 ## 3. Sample flow I ended up with
 
 Current sample flow:
@@ -113,8 +111,6 @@ I did not use fieldmaps because:
 
 So I thought one consistent no-fieldmap branch was better than mixing corrected and uncorrected subjects.
 
-Still, this should be written up honestly as a limitation, especially because frontal and temporal regions can be affected by susceptibility distortion.
-
 ### No FreeSurfer
 
 I did not need `FreeSurfer` because this project is:
@@ -151,7 +147,6 @@ I used retained time rather than retained volume count because the broader proce
 - `9.0` minutes here is a minimum inclusion rule
 - it is not meant to be presented as an ideal or optimal scan length
 
-These rules fit fairly well with the standard motion and censoring literature (`Power et al., 2014`; `Satterthwaite et al., 2013`; `Ciric et al., 2017`).
 
 ## 10. Atlas overlay QC before denoising
 
@@ -160,8 +155,6 @@ Before denoising, I check atlas alignment with:
 - [09_check_atlas_overlay.py](../code/primary/09_check_atlas_overlay.py)
 
 This overlays the `Schaefer 200 / Yeo 7` atlas onto each participant's normalized `T1w` image in MNI `2 mm` space.
-
-The point of this step is just to make sure the atlas sits sensibly on the normalized anatomy before parcel extraction.
 
 Outputs:
 
@@ -205,8 +198,6 @@ The main branch does not automatically add:
 
 Those are treated as sensitivity options instead.
 
-So this is a reasonable scrub rule, but I should probably describe it as moderate rather than ultra-conservative.
-
 ## 14. Nuisance regressors in the main branch
 
 The main nuisance model includes:
@@ -218,8 +209,6 @@ The main nuisance model includes:
 - first 6 `aCompCor` components
 
 The main branch does not include global signal regression. GSR is only kept as a separate sensitivity branch.
-
-I should write this as one accepted approach rather than sounding like it is the only correct one (`Murphy and Fox, 2017`).
 
 ## 15. Note to self on aCompCor
 
@@ -247,7 +236,7 @@ So physiological noise is only being handled indirectly through:
 - CSF signal
 - `aCompCor`
 
-That means physiological noise is reduced, but not fully modeled (`Birn, 2012`).
+Physiological noise is reduced, but not fully modeled (`Birn, 2012`).
 
 ## 17. Denoising order in the main branch
 
@@ -262,7 +251,7 @@ With `sample_mask` and Butterworth filtering, the effective order is:
 7. regress out confounds
 8. standardize the final parcel time series
 
-This matters because filtering and regression can interact badly if done in a sloppy order (`Lindquist et al., 2019`).
+Matters because filtering and regression can interact badly if done in a sloppy order (`Lindquist et al., 2019`).
 
 ## 18. Denoising outputs
 
@@ -280,9 +269,7 @@ Important interpretation boundary:
 - nuisance regression and censoring reduce non-neural variance, but they do not turn the data into a pure measure of neuronal activity
 - later connectivity and segregation results should therefore be described as BOLD-based functional connectivity estimates
 
-## 19. Extra QC reporting I added later
-
-To make the QC story stronger, the workflow now also writes:
+## 19. Extra QC reporting added later
 
 - sample-flow figure
 - retained-minutes distribution
@@ -303,11 +290,11 @@ Key outputs:
 - [qcfc_summary.tsv](../data/processed/qc/reporting/qcfc_summary.tsv)
 - [qcfc_edge_summary.tsv](../data/processed/qc/reporting/qcfc_edge_summary.tsv)
 
-These QC-FC outputs are there to show the residual motion pattern honestly, not to pretend motion is gone completely.
+These QC-FC outputs are there to show the residual motion pattern
 
-## 20. Formal sensitivity branches I now have
+## 20. Formal sensitivity branches
 
-The preprocessing / denoising side now includes these named sensitivity branches:
+The preprocessing / denoising side includes sensitivity branches:
 
 - GSR branch
 - Schaefer-100 branch
@@ -337,23 +324,15 @@ Other robustness checks linked to the same preprocessing / denoising decisions a
 
 ## 21. Main limitations I still need to say clearly
 
-Even with the improvements, I should still say explicitly that:
-
 - fieldmap correction was not available in a consistent usable form
 - the main censoring rule is transparent and defensible, but not the most conservative possible
 - physiological recordings were not available
 - the no-`GSR` branch is one valid choice, not the only one
 - denoised BOLD time series are still indirect measures of underlying neural activity
 
-Being open about that makes the workflow look stronger, not weaker.
-
 ## 22. Atlas interpretation boundary
 
 The main atlas is cortical only.
-
-So the `Limbic` label here means the cortical Schaefer/Yeo limbic network. It does not mean I am directly measuring hippocampus, amygdala, thalamus, basal ganglia, or cerebellum.
-
-That is worth keeping in mind when writing anything about memory or limbic effects.
 
 ## 23. Reproducibility files
 
@@ -368,7 +347,3 @@ Main implementation details are also recoverable from:
 - [05_run_fmriprep_subjects.sh](../code/primary/05_run_fmriprep_subjects.sh)
 - [10_run_denoising.py](../code/primary/10_run_denoising.py)
 - [denoising_settings.tsv](../data/processed/denoising/metrics/denoising_settings.tsv)
-
-Current workflow snapshot commit:
-
-- `d10985de220978834e485821a805b72c92c70521`

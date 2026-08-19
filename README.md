@@ -2,42 +2,6 @@
 
 This repo contains the main workflow I used for my dissertation analysis of resting-state network segregation in OpenNeuro `ds005752`.
 
-The aim of the cleanup here is simple:
-
-- keep the main workflow easy to follow from start to finish
-- keep the optional branches available without mixing them into the main path
-- make it obvious which scripts are primary, which are checks, and which are extensions
-
-## Quick Start
-
-If someone wants the shortest reproducible main path, the core commands are:
-
-```bash
-python code/primary/01_filter_mri_participants.py
-python code/primary/02_split_age_groups.py
-python code/primary/03_screen_remote_anat_forward_rest.py
-bash code/primary/04_download_openneuro_subjects.sh
-export FS_LICENSE=$HOME/license.txt
-bash code/primary/05_run_fmriprep_subjects.sh
-python code/primary/08_build_clean_sample.py
-python code/primary/09_check_atlas_overlay.py
-python code/primary/10_run_denoising.py
-python code/primary/11_run_connectivity_analysis.py
-python code/primary/12_run_age_group_analysis.py
-```
-
-The numbering jumps from `05` to `08` here on purpose.
-`code/primary/06_prepare_manual_qc_review.py` and `code/primary/07_qc_from_confounds.py`
-are usually run automatically inside `code/primary/05_run_fmriprep_subjects.sh`, so
-they do not normally need to be called separately in the shortest workflow.
-
-Main follow-up inference:
-
-```bash
-python code/followup/20_run_permutation_fdr_analysis.py
-python code/followup/17_run_normative_analysis.py
-```
-
 ## Main Idea
 
 The primary branch of the project is:
@@ -77,9 +41,6 @@ The `code/` folder is now split by purpose.
 - `code/sensitivity/`
   Sensitivity branches and comparison scripts.
 
-- `code/exploratory/`
-  Exploratory extensions such as PCA anomaly scoring and classification.
-
 ## Main Workflow
 
 Run these from the repo root:
@@ -106,10 +67,10 @@ These are the main QC and inference follow-ups I would normally run after that:
 
 ```bash
 python code/followup/20_run_permutation_fdr_analysis.py
-python code/followup/17_run_normative_analysis.py
+python code/followup/17_run_younger_reference_deviation_analysis.py
 ```
 
-`code/primary/07_qc_from_confounds.py` and `code/primary/06_prepare_manual_qc_review.py` are normally called inside `code/primary/05_run_fmriprep_subjects.sh`, so I do not usually need to run them separately.
+`code/primary/07_qc_from_confounds.py` and `code/primary/06_prepare_manual_qc_review.py` are normally called inside `code/primary/05_run_fmriprep_subjects.sh`, so they do not usually need to be run separately.
 
 ## Primary Sample
 
@@ -170,7 +131,7 @@ That is the sample that should be treated as primary in the write-up.
 - `code/followup/20_run_permutation_fdr_analysis.py`
   Adds the stricter permutation and FDR-based inferential layer.
 
-- `code/followup/17_run_normative_analysis.py`
+- `code/followup/17_run_younger_reference_deviation_analysis.py`
   Scores older participants relative to the younger reference distribution.
 
 - `code/followup/18_run_within_between_analysis.py`
@@ -189,15 +150,6 @@ That is the sample that should be treated as primary in the write-up.
 
 - `code/sensitivity/23_compare_sensitivity_branches.py`
   Compares the main branch against the sensitivity branches.
-
-## Exploratory Analyses
-
-- `code/exploratory/24_run_pca_anomaly_analysis.py`
-  PCA-based anomaly/deviation scoring.
-
-- `code/exploratory/25_run_classification_analysis.py`
-  Small exploratory classification branch.
-
 
 ## Main Output Folders
 
