@@ -27,7 +27,7 @@ conda activate fmri-aging
 
 ## Repo Layout
 
-The `code/` folder is now split by purpose.
+The `code/` folder is split by purpose.
 
 - `code/primary/`
   Main scripts needed to go from screened participants to the primary analysis outputs.
@@ -59,18 +59,16 @@ python code/primary/11_run_connectivity_analysis.py
 python code/primary/12_run_age_group_analysis.py
 ```
 
-Again, the jump from `05` to `08` is expected in the short run list because
+The jump from `05` to `08` is expected in the short run list because
 `05_run_fmriprep_subjects.sh` normally triggers `06_prepare_manual_qc_review.py`
-and `07_qc_from_confounds.py` for me.
+and `07_qc_from_confounds.py`.
 
-These are the main QC and inference follow-ups I would normally run after that:
+These are the main QC and inference follow-ups I would run after that:
 
 ```bash
 python code/followup/20_run_permutation_fdr_analysis.py
 python code/followup/17_run_younger_reference_deviation_analysis.py
 ```
-
-`code/primary/07_qc_from_confounds.py` and `code/primary/06_prepare_manual_qc_review.py` are normally called inside `code/primary/05_run_fmriprep_subjects.sh`, so they do not usually need to be run separately.
 
 ## Primary Sample
 
@@ -78,7 +76,7 @@ The locked primary sample for the dissertation is:
 
 - `data/processed/screening/ds005752_final_analysis_sample_tr_3s.tsv`
 
-That is the sample that should be treated as primary in the write-up.
+That is the sample that should be treated as primary.
 
 ## Main Scripts
 
