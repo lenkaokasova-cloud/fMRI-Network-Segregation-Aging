@@ -29,7 +29,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from dissertation_figure_style import (
+from code.utilities.dissertation_figure_style import (
     FIG_DPI,
     GRID_COLOR,
     MUTED_REFERENCE_LINE_COLOR,
@@ -42,8 +42,8 @@ from dissertation_figure_style import (
     apply_dissertation_rcparams,
     darken_axis_text,
 )
-from dissertation_figure_style import save_figure as save_dissertation_figure
-from dissertation_figure_style import (
+from code.utilities.dissertation_figure_style import save_figure as save_dissertation_figure
+from code.utilities.dissertation_figure_style import (
     style_spines,
 )
 
