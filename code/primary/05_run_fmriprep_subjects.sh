@@ -149,7 +149,6 @@ subject_outputs_complete() {
   local confounds_file="${func_dir}/${subject}_ses-01_task-rest_dir-forward_desc-confounds_timeseries.tsv"
   local json_file="${func_dir}/${subject}_ses-01_task-rest_dir-forward_space-MNI152NLin2009cAsym_res-${OUTPUT_RES}_desc-preproc_bold.json"
 
-  # I use these four files as the minimum proof that the forward run is ready for analysis.
   [[ -f "${report_file}" && -f "${bold_file}" && -f "${confounds_file}" && -f "${json_file}" ]]
 }
 
@@ -172,7 +171,6 @@ run_fmriprep_subject() {
     SKIPPED_SUBJECTS+=("${subject}")
   else
     if [[ "${FORCE_FMRIPREP}" != "1" && -f "${report_file}" ]]; then
-      # A report on its own is not enough, so partial outputs trigger a clean rerun here.
       printf 'Found partial outputs for %s. Rerunning because the required forward outputs are incomplete.\n' "${subject}"
     fi
 
@@ -218,7 +216,6 @@ run_fmriprep_subject() {
   if ! subject_outputs_complete "${subject}"; then
     printf 'Required forward outputs are still incomplete for %s after the run. Skipping QC.\n' "${subject}" >&2
     record_status "${subject}" "incomplete_outputs" "Subject report or forward outputs are incomplete after run."
-    # On macOS Bash 3.2, empty arrays can trip `set -u` unless expanded with a default.
     if ! contains_subject "${subject}" "${FAILED_SUBJECTS[@]:-}"; then
       FAILED_SUBJECTS+=("${subject}")
     fi
@@ -226,7 +223,6 @@ run_fmriprep_subject() {
   fi
 
   printf 'Running QC summary for %s...\n' "${subject}"
-  # I regenerate the QC summary right away so the screening tables stay in sync with the newest run.
   python "${SCRIPT_DIR}/07_qc_from_confounds.py" --subject "${subject}"
   if ! contains_subject "${subject}" "${SKIPPED_SUBJECTS[@]:-}"; then
     record_status "${subject}" "completed" "${subject_log}"
@@ -277,7 +273,6 @@ SKIPPED_SUBJECTS=()
 MISSING_RAW_SUBJECTS=()
 
 for subject in "${SUBJECTS[@]}"; do
-  # I run subjects one-by-one here so a single failure does not automatically ruin the whole batch.
   if run_fmriprep_subject "${subject}"; then
     :
   elif [[ "${CONTINUE_ON_ERROR}" == "1" ]]; then

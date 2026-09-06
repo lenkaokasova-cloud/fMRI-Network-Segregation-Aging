@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # What this script does:
-#   Makes quick QC figures for the denoised parcel time series so I can check
+#   Makes QC figures for the denoised parcel time series so I can check
 #   whether the saved time series look sensible before connectivity analysis.
 # How to run it:
 #   Run from the repo root with:
@@ -17,12 +17,13 @@ import os
 import sys
 from pathlib import Path
 
-os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve()))
+os.environ.setdefault(
+    "MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve())
+)
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -190,7 +191,6 @@ def inspect_time_series(
     expected_retained_volumes: int,
     figure_path: Path,
 ) -> dict[str, object]:
-    # This is just a sanity check that the saved parcel series still look numerically usable.
     has_nan = bool(np.isnan(time_series).any())
     has_inf = bool(np.isinf(time_series).any())
     n_timepoints, n_parcels = time_series.shape
@@ -253,7 +253,9 @@ def main() -> None:
         missing = requested.difference(set(summary["subject_id"]))
         if missing:
             missing_str = ", ".join(sorted(missing))
-            raise ValueError(f"Requested subjects not found in summary TSV: {missing_str}")
+            raise ValueError(
+                f"Requested subjects not found in summary TSV: {missing_str}"
+            )
 
     if summary.empty:
         raise ValueError("No subjects remain to inspect.")
@@ -261,11 +263,12 @@ def main() -> None:
     summary_rows: list[dict[str, object]] = []
 
     for row in summary.sort_values(["subject_id"]).itertuples(index=False):
-        # I save one figure per subject so I can quickly spot anything that looks obviously wrong.
         subject = row.subject_id
         timeseries_path = resolve_project_path(row.timeseries_file)
         if not timeseries_path.exists():
-            raise FileNotFoundError(f"Time series file is missing for {subject}: {timeseries_path}")
+            raise FileNotFoundError(
+                f"Time series file is missing for {subject}: {timeseries_path}"
+            )
 
         time_series = np.load(timeseries_path)
         if time_series.ndim != 2:

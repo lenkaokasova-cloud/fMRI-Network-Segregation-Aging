@@ -8,7 +8,7 @@
 #   python code/utilities/16_build_dissertation_summary_outputs.py
 # Main output:
 #   data/processed/analysis/dissertation_summary/
-#   This now includes:
+#   This includes:
 #   - the main age-effects summary table and figure
 #   - a global-effect sensitivity forest-style figure
 #   - a 7 x 7 older-minus-younger network connectivity heatmap
@@ -19,15 +19,24 @@ import argparse
 import os
 from pathlib import Path
 
-os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve()))
+os.environ.setdefault(
+    "MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve())
+)
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-NETWORK_ORDER = ["Vis", "SomMot", "DorsAttn", "SalVentAttn", "Limbic", "Cont", "Default"]
+NETWORK_ORDER = [
+    "Vis",
+    "SomMot",
+    "DorsAttn",
+    "SalVentAttn",
+    "Limbic",
+    "Cont",
+    "Default",
+]
 FIG_DPI = 300
 TITLE_SIZE = 14
 LABEL_SIZE = 11
@@ -149,13 +158,15 @@ def matrix_subject_id_from_path(path: Path) -> str:
 
 
 def clean_overall_table(overall_df: pd.DataFrame) -> pd.DataFrame:
-    keep = overall_df[overall_df["outcome"].isin(
-        [
-            "global_segregation_prop",
-            "overall_within_mean",
-            "overall_between_mean",
-        ]
-    )].copy()
+    keep = overall_df[
+        overall_df["outcome"].isin(
+            [
+                "global_segregation_prop",
+                "overall_within_mean",
+                "overall_between_mean",
+            ]
+        )
+    ].copy()
 
     label_map = {
         "global_segregation_prop": "Global segregation",
@@ -183,42 +194,49 @@ def clean_network_table(network_df: pd.DataFrame) -> pd.DataFrame:
     return keep
 
 
-def build_headline_table(overall_df: pd.DataFrame, network_df: pd.DataFrame) -> pd.DataFrame:
+def build_headline_table(
+    overall_df: pd.DataFrame, network_df: pd.DataFrame
+) -> pd.DataFrame:
     overall = clean_overall_table(overall_df)
     network = clean_network_table(network_df)
     combined = pd.concat([overall, network], ignore_index=True, sort=False)
-    combined["group_order"] = combined["result_group"].map({"overall": 0, "network_specific": 1})
+    combined["group_order"] = combined["result_group"].map(
+        {"overall": 0, "network_specific": 1}
+    )
     combined["significant_fdr_lt_0p05"] = combined["fdr_q_value"].astype(float) < 0.05
     combined["ci_text"] = combined.apply(
         lambda row: f"[{row['conf_low']:.4f}, {row['conf_high']:.4f}]",
         axis=1,
     )
-    combined = combined[
-        [
-            "result_group",
-            "group_order",
-            "display_order",
-            "result_label",
-            "network",
-            "estimate_older_vs_young",
-            "conf_low",
-            "conf_high",
-            "ci_text",
-            "permutation_p_value",
-            "fdr_q_value",
-            "young_mean",
-            "older_mean",
-            "older_minus_young_mean",
-            "n_subjects",
-            "significant_fdr_lt_0p05",
+    combined = (
+        combined[
+            [
+                "result_group",
+                "group_order",
+                "display_order",
+                "result_label",
+                "network",
+                "estimate_older_vs_young",
+                "conf_low",
+                "conf_high",
+                "ci_text",
+                "permutation_p_value",
+                "fdr_q_value",
+                "young_mean",
+                "older_mean",
+                "older_minus_young_mean",
+                "n_subjects",
+                "significant_fdr_lt_0p05",
+            ]
         ]
-    ].sort_values(["group_order", "display_order", "result_label"]).reset_index(drop=True)
+        .sort_values(["group_order", "display_order", "result_label"])
+        .reset_index(drop=True)
+    )
     combined = combined.drop(columns=["group_order"])
     return combined
 
 
 def build_word_friendly_table(headline_table: pd.DataFrame) -> pd.DataFrame:
-    # This is the cleaner dissertation table version with friendlier labels and rounded values for Word.
     out = headline_table.copy()
     out["section"] = out["result_group"].map(
         {
@@ -230,7 +248,9 @@ def build_word_friendly_table(headline_table: pd.DataFrame) -> pd.DataFrame:
     out["young_mean"] = out["young_mean"].astype(float).round(3)
     out["older_mean"] = out["older_mean"].astype(float).round(3)
     out["older_minus_young_mean"] = out["older_minus_young_mean"].astype(float).round(3)
-    out["estimate_older_vs_young"] = out["estimate_older_vs_young"].astype(float).round(3)
+    out["estimate_older_vs_young"] = (
+        out["estimate_older_vs_young"].astype(float).round(3)
+    )
     out["permutation_p_value"] = out["permutation_p_value"].astype(float).round(3)
     out["fdr_q_value"] = out["fdr_q_value"].astype(float).round(3)
     out["ci_95"] = out.apply(
@@ -285,7 +305,6 @@ def format_count_pct(mask: pd.Series, total_n: int, decimals: int = 1) -> str:
 
 
 def build_participant_characteristics_table(sample_df: pd.DataFrame) -> pd.DataFrame:
-    # This builds a dissertation-style Table 1 with Total / Young / Older columns from the locked final sample.
     groups = {
         "Total": sample_df.copy(),
         "Young (20-25)": sample_df[sample_df["age_group"] == "young"].copy(),
@@ -303,9 +322,18 @@ def build_participant_characteristics_table(sample_df: pd.DataFrame) -> pd.DataF
     add_row("N", lambda df: str(len(df)))
     add_row("Age, years, mean (SD)", lambda df: format_mean_sd(df["age"], decimals=2))
     add_row("Age range, years", lambda df: format_range(df["age"], decimals=0))
-    add_row("Female, n (%)", lambda df: format_count_pct(df["sex"].astype(str).eq("female"), len(df)))
-    add_row("Male, n (%)", lambda df: format_count_pct(df["sex"].astype(str).eq("male"), len(df)))
-    add_row("Right-handed, n (%)", lambda df: format_count_pct(df["handedness"].astype(str).eq("right"), len(df)))
+    add_row(
+        "Female, n (%)",
+        lambda df: format_count_pct(df["sex"].astype(str).eq("female"), len(df)),
+    )
+    add_row(
+        "Male, n (%)",
+        lambda df: format_count_pct(df["sex"].astype(str).eq("male"), len(df)),
+    )
+    add_row(
+        "Right-handed, n (%)",
+        lambda df: format_count_pct(df["handedness"].astype(str).eq("right"), len(df)),
+    )
     add_row(
         "Mean framewise displacement, mm, mean (SD)",
         lambda df: format_mean_sd(df["mean_fd"], decimals=3),
@@ -346,7 +374,9 @@ def style_y_grid_axis(ax: plt.Axes) -> None:
     ax.axvline(0.0, color=REFERENCE_LINE_COLOR, linewidth=1.2, alpha=0.92)
 
 
-def add_q_labels(ax: plt.Axes, values: np.ndarray, y_positions: np.ndarray, q_values: np.ndarray) -> None:
+def add_q_labels(
+    ax: plt.Axes, values: np.ndarray, y_positions: np.ndarray, q_values: np.ndarray
+) -> None:
     finite_values = values[np.isfinite(values)]
     finite_lows = []
     finite_highs = []
@@ -390,9 +420,19 @@ def emphasize_headline_title(ax: plt.Axes) -> None:
     ax.title.set_fontweight("bold")
 
 
-def plot_headline_effects(overall_df: pd.DataFrame, network_df: pd.DataFrame, outpath: Path) -> None:
-    overall = clean_overall_table(overall_df).sort_values("display_order").reset_index(drop=True)
-    network = clean_network_table(network_df).sort_values("display_order").reset_index(drop=True)
+def plot_headline_effects(
+    overall_df: pd.DataFrame, network_df: pd.DataFrame, outpath: Path
+) -> None:
+    overall = (
+        clean_overall_table(overall_df)
+        .sort_values("display_order")
+        .reset_index(drop=True)
+    )
+    network = (
+        clean_network_table(network_df)
+        .sort_values("display_order")
+        .reset_index(drop=True)
+    )
     overall_tick_labels = [
         "Global\nsegregation",
         "Within-network\nconnectivity",
@@ -406,7 +446,6 @@ def plot_headline_effects(overall_df: pd.DataFrame, network_df: pd.DataFrame, ou
         gridspec_kw={"width_ratios": [1.0, 1.22]},
     )
 
-    # This left panel keeps the three big-picture outcomes together so the reader sees the headline pattern first.
     ax = axes[0]
     y_overall = np.arange(len(overall))[::-1]
     ax.errorbar(
@@ -441,7 +480,6 @@ def plot_headline_effects(overall_df: pd.DataFrame, network_df: pd.DataFrame, ou
         overall["fdr_q_value"].to_numpy(dtype=float),
     )
 
-    # This right panel focuses only on network-specific segregation, which is the cleaner network-level story.
     ax = axes[1]
     y_network = np.arange(len(network))[::-1]
     colors = np.where(
@@ -455,7 +493,10 @@ def plot_headline_effects(overall_df: pd.DataFrame, network_df: pd.DataFrame, ou
         ax.errorbar(
             row["estimate_older_vs_young"],
             y,
-            xerr=[[row["estimate_older_vs_young"] - row["conf_low"]], [row["conf_high"] - row["estimate_older_vs_young"]]],
+            xerr=[
+                [row["estimate_older_vs_young"] - row["conf_low"]],
+                [row["conf_high"] - row["estimate_older_vs_young"]],
+            ],
             fmt="o",
             color=color,
             ecolor=color,
@@ -480,7 +521,9 @@ def plot_headline_effects(overall_df: pd.DataFrame, network_df: pd.DataFrame, ou
         network["fdr_q_value"].to_numpy(dtype=float),
     )
 
-    fig.suptitle("Primary age effects", y=1.01, fontsize=23, fontweight="bold", color="#07131F")
+    fig.suptitle(
+        "Primary age effects", y=1.01, fontsize=23, fontweight="bold", color="#07131F"
+    )
     save_figure(fig, outpath)
 
 
@@ -490,13 +533,14 @@ def build_sensitivity_forest_table(
     retained_minutes_df: pd.DataFrame,
     balanced_overall_df: pd.DataFrame,
 ) -> pd.DataFrame:
-    # This combines the main branch, the named methodological branches, and the two most useful sample/covariate checks.
     branch_keep = branch_df.copy()
     branch_keep["branch_key"] = branch_keep["branch"].astype(str)
     branch_keep["estimate"] = branch_keep["global_estimate"].astype(float)
     branch_keep["conf_low"] = branch_keep["global_conf_low"].astype(float)
     branch_keep["conf_high"] = branch_keep["global_conf_high"].astype(float)
-    branch_keep["n_total"] = branch_keep["n_young"].astype(int) + branch_keep["n_older"].astype(int)
+    branch_keep["n_total"] = branch_keep["n_young"].astype(int) + branch_keep[
+        "n_older"
+    ].astype(int)
     branch_keep["n_label"] = (
         "n="
         + branch_keep["n_total"].astype(int).astype(str)
@@ -646,7 +690,11 @@ def build_sensitivity_forest_table(
 def plot_sensitivity_forest(sensitivity_df: pd.DataFrame, outpath: Path) -> None:
     fig, ax = plt.subplots(figsize=(10.6, 6.3))
 
-    plot_df = sensitivity_df.copy().sort_values("display_order", ascending=True).reset_index(drop=True)
+    plot_df = (
+        sensitivity_df.copy()
+        .sort_values("display_order", ascending=True)
+        .reset_index(drop=True)
+    )
     y = np.arange(len(plot_df))[::-1]
     colors = []
     for branch_key in plot_df["branch_key"]:
@@ -659,7 +707,10 @@ def plot_sensitivity_forest(sensitivity_df: pd.DataFrame, outpath: Path) -> None
         ax.errorbar(
             row["estimate"],
             y[idx],
-            xerr=[[row["estimate"] - row["conf_low"]], [row["conf_high"] - row["estimate"]]],
+            xerr=[
+                [row["estimate"] - row["conf_low"]],
+                [row["conf_high"] - row["estimate"]],
+            ],
             fmt="o",
             color=colors[idx],
             ecolor=colors[idx],
@@ -698,12 +749,20 @@ def plot_sensitivity_forest(sensitivity_df: pd.DataFrame, outpath: Path) -> None
     save_figure(fig, outpath)
 
 
-def compute_subject_network_mean_matrix(matrix: np.ndarray, atlas_df: pd.DataFrame) -> np.ndarray:
-    network_matrix = np.full((len(NETWORK_ORDER), len(NETWORK_ORDER)), np.nan, dtype=float)
+def compute_subject_network_mean_matrix(
+    matrix: np.ndarray, atlas_df: pd.DataFrame
+) -> np.ndarray:
+    network_matrix = np.full(
+        (len(NETWORK_ORDER), len(NETWORK_ORDER)), np.nan, dtype=float
+    )
     for i, network_i in enumerate(NETWORK_ORDER):
-        idx_i = atlas_df.loc[atlas_df["network"].astype(str) == network_i, "parcel_index"].to_numpy(dtype=int)
+        idx_i = atlas_df.loc[
+            atlas_df["network"].astype(str) == network_i, "parcel_index"
+        ].to_numpy(dtype=int)
         for j, network_j in enumerate(NETWORK_ORDER):
-            idx_j = atlas_df.loc[atlas_df["network"].astype(str) == network_j, "parcel_index"].to_numpy(dtype=int)
+            idx_j = atlas_df.loc[
+                atlas_df["network"].astype(str) == network_j, "parcel_index"
+            ].to_numpy(dtype=int)
             block = matrix[np.ix_(idx_i, idx_j)]
             if i == j:
                 mask = ~np.eye(block.shape[0], dtype=bool)
@@ -737,7 +796,9 @@ def build_network_connectivity_group_matrices(
             older_blocks.append(network_matrix)
 
     if not young_blocks or not older_blocks:
-        raise RuntimeError("Could not build network connectivity group matrices from the final sample.")
+        raise RuntimeError(
+            "Could not build network connectivity group matrices from the final sample."
+        )
 
     young_mean = np.nanmean(np.stack(young_blocks, axis=0), axis=0)
     older_mean = np.nanmean(np.stack(older_blocks, axis=0), axis=0)
@@ -782,7 +843,6 @@ def plot_network_difference_heatmap(diff_matrix: np.ndarray, outpath: Path) -> N
     enlarge_headline_axis_text(ax)
     emphasize_headline_title(ax)
 
-    # Diagonal cells are within-network means; the off-diagonal cells summarize between-network coupling.
     for i in range(len(NETWORK_ORDER)):
         ax.add_patch(
             plt.Rectangle(
@@ -800,7 +860,15 @@ def plot_network_difference_heatmap(diff_matrix: np.ndarray, outpath: Path) -> N
         for j in range(len(NETWORK_ORDER)):
             value = diff_matrix[i, j]
             text_color = "white" if abs(value) > (0.55 * vmax) else "black"
-            ax.text(j, i, f"{value:.2f}", ha="center", va="center", fontsize=8.9, color=text_color)
+            ax.text(
+                j,
+                i,
+                f"{value:.2f}",
+                ha="center",
+                va="center",
+                fontsize=8.9,
+                color=text_color,
+            )
 
     cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     cbar.set_label(
@@ -819,9 +887,9 @@ def write_summary_markdown(table: pd.DataFrame, outpath: Path) -> None:
     network = table[table["result_group"] == "network_specific"].copy()
 
     lines = [
-        "# Dissertation Summary Outputs",
+        "# Summary Outputs",
         "",
-        "This folder contains one compact headline table and one coefficient-style figure for dissertation write-up.",
+        "This folder contains one compact headline table and one coefficient-style figure",
         "",
         "## Overall Outcomes",
         "",
@@ -848,9 +916,9 @@ def write_summary_markdown(table: pd.DataFrame, outpath: Path) -> None:
             "",
             "- The confidence intervals in these summary outputs are model-based robust intervals carried through from the regression summaries.",
             "- The p values and q values are permutation-based from the Freedman-Lane analysis.",
-            "- These should therefore not be described as permutation-based confidence intervals in the dissertation text.",
+            "- These should therefore not be described as permutation-based confidence intervals.",
             "",
-            "## Extra dissertation-strengthening figures",
+            "## Summary figures for dissertation",
             "",
             "- `figures/global_effect_sensitivity_forest.png` summarizes how the older-versus-younger global segregation estimate behaves across the main branch, methodological sensitivity branches, and key sample/covariate checks.",
             "- `figures/older_minus_younger_network_connectivity_heatmap.png` summarizes the older-minus-younger 7 x 7 network-level Fisher z connectivity pattern using the final primary sample.",
@@ -875,8 +943,12 @@ def main() -> None:
     figures_dir.mkdir(parents=True, exist_ok=True)
 
     sample_df = pd.read_csv(sample_path, sep="\t")
-    overall_df = pd.read_csv(permutation_dir / "overall_permutation_summary.tsv", sep="\t")
-    network_df = pd.read_csv(permutation_dir / "network_permutation_summary.tsv", sep="\t")
+    overall_df = pd.read_csv(
+        permutation_dir / "overall_permutation_summary.tsv", sep="\t"
+    )
+    network_df = pd.read_csv(
+        permutation_dir / "network_permutation_summary.tsv", sep="\t"
+    )
     sensitivity_branch_df = pd.read_csv(sensitivity_branch_table_path, sep="\t")
     stricter_motion_df = pd.read_csv(stricter_motion_table_path, sep="\t")
     retained_minutes_df = pd.read_csv(retained_minutes_table_path, sep="\t")
@@ -892,43 +964,68 @@ def main() -> None:
         retained_minutes_df,
         balanced_overall_df,
     )
-    young_network_mean, older_network_mean, older_minus_young_network_mean = build_network_connectivity_group_matrices(
-        sample_df,
-        atlas_df,
-        matrices_dir,
+    young_network_mean, older_network_mean, older_minus_young_network_mean = (
+        build_network_connectivity_group_matrices(
+            sample_df,
+            atlas_df,
+            matrices_dir,
+        )
     )
     network_connectivity_long = (
         matrix_to_long_table(young_network_mean, "young_mean_z")
-        .merge(matrix_to_long_table(older_network_mean, "older_mean_z"), on=["row_network", "column_network"])
         .merge(
-            matrix_to_long_table(older_minus_young_network_mean, "older_minus_young_mean_z"),
+            matrix_to_long_table(older_network_mean, "older_mean_z"),
+            on=["row_network", "column_network"],
+        )
+        .merge(
+            matrix_to_long_table(
+                older_minus_young_network_mean, "older_minus_young_mean_z"
+            ),
             on=["row_network", "column_network"],
         )
     )
 
-    headline_table.to_csv(output_dir / "main_age_effects_summary.tsv", sep="\t", index=False)
-    word_table.to_csv(output_dir / "table2_main_age_effects_word_friendly.tsv", sep="\t", index=False)
-    word_table.to_csv(output_dir / "table2_main_age_effects_word_friendly.csv", index=False)
-    characteristics_table.to_csv(output_dir / "table1_participant_characteristics.tsv", sep="\t", index=False)
-    characteristics_table.to_csv(output_dir / "table1_participant_characteristics.csv", index=False)
-    sensitivity_forest_df.to_csv(output_dir / "global_effect_sensitivity_forest.tsv", sep="\t", index=False)
-    network_connectivity_long.to_csv(output_dir / "network_connectivity_group_means.tsv", sep="\t", index=False)
+    headline_table.to_csv(
+        output_dir / "main_age_effects_summary.tsv", sep="\t", index=False
+    )
+    word_table.to_csv(
+        output_dir / "table2_main_age_effects_word_friendly.tsv", sep="\t", index=False
+    )
+    word_table.to_csv(
+        output_dir / "table2_main_age_effects_word_friendly.csv", index=False
+    )
+    characteristics_table.to_csv(
+        output_dir / "table1_participant_characteristics.tsv", sep="\t", index=False
+    )
+    characteristics_table.to_csv(
+        output_dir / "table1_participant_characteristics.csv", index=False
+    )
+    sensitivity_forest_df.to_csv(
+        output_dir / "global_effect_sensitivity_forest.tsv", sep="\t", index=False
+    )
+    network_connectivity_long.to_csv(
+        output_dir / "network_connectivity_group_means.tsv", sep="\t", index=False
+    )
     pd.DataFrame(young_network_mean, index=NETWORK_ORDER, columns=NETWORK_ORDER).to_csv(
         output_dir / "young_mean_network_connectivity_matrix.csv"
     )
     pd.DataFrame(older_network_mean, index=NETWORK_ORDER, columns=NETWORK_ORDER).to_csv(
         output_dir / "older_mean_network_connectivity_matrix.csv"
     )
-    pd.DataFrame(older_minus_young_network_mean, index=NETWORK_ORDER, columns=NETWORK_ORDER).to_csv(
-        output_dir / "older_minus_young_network_connectivity_matrix.csv"
-    )
+    pd.DataFrame(
+        older_minus_young_network_mean, index=NETWORK_ORDER, columns=NETWORK_ORDER
+    ).to_csv(output_dir / "older_minus_young_network_connectivity_matrix.csv")
 
     pd.DataFrame(
         [
             {
                 "source_sample_table": str(sample_path),
-                "source_overall_table": str(permutation_dir / "overall_permutation_summary.tsv"),
-                "source_network_table": str(permutation_dir / "network_permutation_summary.tsv"),
+                "source_overall_table": str(
+                    permutation_dir / "overall_permutation_summary.tsv"
+                ),
+                "source_network_table": str(
+                    permutation_dir / "network_permutation_summary.tsv"
+                ),
                 "included_overall_outcomes": "global_segregation_prop,overall_within_mean,overall_between_mean",
                 "included_network_component": "segregation_prop",
                 "figure": "figures/main_age_effects_summary.png",
@@ -960,11 +1057,21 @@ def main() -> None:
     )
     write_summary_markdown(headline_table, output_dir / "dissertation_summary.md")
 
-    print(f"Wrote dissertation summary table to {output_dir / 'main_age_effects_summary.tsv'}")
-    print(f"Wrote participant characteristics table to {output_dir / 'table1_participant_characteristics.tsv'}")
-    print(f"Wrote Word-friendly table to {output_dir / 'table2_main_age_effects_word_friendly.tsv'}")
-    print(f"Wrote dissertation summary figure to {figures_dir / 'main_age_effects_summary.png'}")
-    print(f"Wrote sensitivity forest figure to {figures_dir / 'global_effect_sensitivity_forest.png'}")
+    print(
+        f"Wrote dissertation summary table to {output_dir / 'main_age_effects_summary.tsv'}"
+    )
+    print(
+        f"Wrote participant characteristics table to {output_dir / 'table1_participant_characteristics.tsv'}"
+    )
+    print(
+        f"Wrote Word-friendly table to {output_dir / 'table2_main_age_effects_word_friendly.tsv'}"
+    )
+    print(
+        f"Wrote dissertation summary figure to {figures_dir / 'main_age_effects_summary.png'}"
+    )
+    print(
+        f"Wrote sensitivity forest figure to {figures_dir / 'global_effect_sensitivity_forest.png'}"
+    )
     print(
         "Wrote network connectivity heatmap to "
         f"{figures_dir / 'older_minus_younger_network_connectivity_heatmap.png'}"

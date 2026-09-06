@@ -15,16 +15,25 @@ import argparse
 import os
 from pathlib import Path
 
-os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve()))
+os.environ.setdefault(
+    "MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve())
+)
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-NETWORK_ORDER = ["Vis", "SomMot", "DorsAttn", "SalVentAttn", "Limbic", "Cont", "Default"]
+NETWORK_ORDER = [
+    "Vis",
+    "SomMot",
+    "DorsAttn",
+    "SalVentAttn",
+    "Limbic",
+    "Cont",
+    "Default",
+]
 SEGREGATION_COL = "segregation_prop"
 YOUNG_COLOR = "#5E7FA6"
 OLDER_COLOR = "#C07A5B"
@@ -109,7 +118,10 @@ def resolve_project_path(path_str: str) -> Path:
 def ordered_networks(networks: list[str]) -> list[str]:
     order_index = {network: idx for idx, network in enumerate(NETWORK_ORDER)}
     unique_networks = list(dict.fromkeys(networks))
-    return sorted(unique_networks, key=lambda name: (order_index.get(name, len(order_index)), name))
+    return sorted(
+        unique_networks,
+        key=lambda name: (order_index.get(name, len(order_index)), name),
+    )
 
 
 def style_axis(
@@ -165,9 +177,13 @@ def emphasize_summary_axis(ax: plt.Axes) -> None:
         label.set_fontsize(SUMMARY_TICK_LABEL_SIZE)
 
 
-def load_tables(sample_path: Path, connectivity_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_tables(
+    sample_path: Path, connectivity_dir: Path
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     sample = pd.read_csv(sample_path, sep="\t")
-    network_df = pd.read_csv(connectivity_dir / "subject_network_segregation.tsv", sep="\t")
+    network_df = pd.read_csv(
+        connectivity_dir / "subject_network_segregation.tsv", sep="\t"
+    )
 
     required_sample = {"subject_id", "age", "sex", "age_group"}
     missing_sample = required_sample.difference(sample.columns)
@@ -201,7 +217,14 @@ def build_subject_component_table(network_df: pd.DataFrame) -> pd.DataFrame:
     # Here I split segregation into its two ingredients instead of only keeping the final ratio.
     return (
         network_df.groupby(
-            ["subject_id", "age", "sex", "age_group", "mean_fd", "retained_minutes_after_scrub"],
+            [
+                "subject_id",
+                "age",
+                "sex",
+                "age_group",
+                "mean_fd",
+                "retained_minutes_after_scrub",
+            ],
             as_index=False,
         )
         .agg(
@@ -215,7 +238,9 @@ def build_subject_component_table(network_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def fit_subject_level_model(df: pd.DataFrame, outcome: str):
-    formula = f"{outcome} ~ C(age_group, Treatment(reference='young')) + C(sex) + mean_fd"
+    formula = (
+        f"{outcome} ~ C(age_group, Treatment(reference='young')) + C(sex) + mean_fd"
+    )
     return smf.ols(formula, data=df).fit(cov_type="HC3")
 
 
@@ -240,8 +265,12 @@ def build_subject_effect_table(subject_df: pd.DataFrame) -> pd.DataFrame:
                 "conf_high": estimate + 1.96 * std_error,
                 "p_value": float(result.pvalues[term]),
                 "nobs": float(result.nobs),
-                "young_mean": float(subject_df.loc[subject_df["age_group"] == "young", outcome].mean()),
-                "older_mean": float(subject_df.loc[subject_df["age_group"] == "older", outcome].mean()),
+                "young_mean": float(
+                    subject_df.loc[subject_df["age_group"] == "young", outcome].mean()
+                ),
+                "older_mean": float(
+                    subject_df.loc[subject_df["age_group"] == "older", outcome].mean()
+                ),
                 "older_minus_young_mean": float(
                     subject_df.loc[subject_df["age_group"] == "older", outcome].mean()
                     - subject_df.loc[subject_df["age_group"] == "young", outcome].mean()
@@ -253,7 +282,9 @@ def build_subject_effect_table(subject_df: pd.DataFrame) -> pd.DataFrame:
 
 def fit_network_specific_model(network_df: pd.DataFrame, outcome: str, network: str):
     subset = network_df[network_df["network"] == network].copy()
-    formula = f"{outcome} ~ C(age_group, Treatment(reference='young')) + C(sex) + mean_fd"
+    formula = (
+        f"{outcome} ~ C(age_group, Treatment(reference='young')) + C(sex) + mean_fd"
+    )
     result = smf.ols(formula, data=subset).fit(cov_type="HC3")
     term = "C(age_group, Treatment(reference='young'))[T.older]"
     estimate = float(result.params[term])
@@ -293,7 +324,6 @@ def build_network_effect_table(network_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_network_component_summary(network_effect_df: pd.DataFrame) -> pd.DataFrame:
-    # This brings the within, between, and segregation results for each network back into one readable table.
     keep_cols = [
         "network",
         "young_mean",
@@ -349,7 +379,9 @@ def build_network_component_summary(network_effect_df: pd.DataFrame) -> pd.DataF
         )
         .reset_index(drop=True)
     )
-    return within.merge(between, on="network", how="inner").merge(segregation, on="network", how="inner")
+    return within.merge(between, on="network", how="inner").merge(
+        segregation, on="network", how="inner"
+    )
 
 
 def plot_subject_components(subject_df: pd.DataFrame, outpath: Path) -> None:
@@ -380,7 +412,9 @@ def plot_subject_components(subject_df: pd.DataFrame, outpath: Path) -> None:
             patch.set_edgecolor(color)
             patch.set_linewidth(1.8)
 
-        for x_pos, group, color in zip([0, 1], ["young", "older"], [YOUNG_COLOR, OLDER_COLOR]):
+        for x_pos, group, color in zip(
+            [0, 1], ["young", "older"], [YOUNG_COLOR, OLDER_COLOR]
+        ):
             subset = subject_df[subject_df["age_group"] == group].reset_index(drop=True)
             offsets = group_offsets(len(subset))
             ax.scatter(
@@ -414,14 +448,30 @@ def plot_network_means(network_summary: pd.DataFrame, outpath: Path) -> None:
     ]
 
     for ax, (young_col, older_col, title) in zip(axes, specs):
-        ax.plot(x, network_summary[young_col], color=YOUNG_COLOR, marker="o", linewidth=2.0, label="Young")
-        ax.plot(x, network_summary[older_col], color=OLDER_COLOR, marker="o", linewidth=2.0, label="Older")
+        ax.plot(
+            x,
+            network_summary[young_col],
+            color=YOUNG_COLOR,
+            marker="o",
+            linewidth=2.0,
+            label="Young",
+        )
+        ax.plot(
+            x,
+            network_summary[older_col],
+            color=OLDER_COLOR,
+            marker="o",
+            linewidth=2.0,
+            label="Older",
+        )
         style_axis(ax, title=title, ylabel="Mean Fisher z connectivity")
         ax.set_xticks(x)
         ax.set_xticklabels(networks, rotation=35)
         ax.grid(axis="y", color=GRID_COLOR, alpha=0.55, linewidth=0.8)
 
-    axes[1].legend(frameon=False, loc="upper left", bbox_to_anchor=(1.01, 1.0), borderaxespad=0.0)
+    axes[1].legend(
+        frameon=False, loc="upper left", bbox_to_anchor=(1.01, 1.0), borderaxespad=0.0
+    )
     save_figure(fig, outpath)
 
 
@@ -442,12 +492,14 @@ def plot_network_age_effects(network_effect_df: pd.DataFrame, outpath: Path) -> 
             .reset_index(drop=True)
         )
         estimates = subset["estimate_older_vs_young"].to_numpy()
-        lower = subset["estimate_older_vs_young"].to_numpy() - subset["conf_low"].to_numpy()
-        upper = subset["conf_high"].to_numpy() - subset["estimate_older_vs_young"].to_numpy()
-        colors = [
-            OLDER_COLOR if value > 0 else YOUNG_COLOR
-            for value in estimates
-        ]
+        lower = (
+            subset["estimate_older_vs_young"].to_numpy() - subset["conf_low"].to_numpy()
+        )
+        upper = (
+            subset["conf_high"].to_numpy()
+            - subset["estimate_older_vs_young"].to_numpy()
+        )
+        colors = [OLDER_COLOR if value > 0 else YOUNG_COLOR for value in estimates]
         ax.errorbar(
             estimates,
             y,
@@ -460,7 +512,9 @@ def plot_network_age_effects(network_effect_df: pd.DataFrame, outpath: Path) -> 
             markersize=0,
             zorder=2,
         )
-        ax.scatter(estimates, y, s=80, c=colors, edgecolors="white", linewidths=0.6, zorder=3)
+        ax.scatter(
+            estimates, y, s=80, c=colors, edgecolors="white", linewidths=0.6, zorder=3
+        )
         ax.axvline(0.0, color=REFERENCE_LINE_COLOR, linewidth=1.2, linestyle="--")
         style_axis(ax, title=title, xlabel="Older minus young estimate")
         ax.grid(axis="x", color=GRID_COLOR, alpha=0.55, linewidth=0.8)
@@ -475,8 +529,12 @@ def write_summary_markdown(
     subject_effect_df: pd.DataFrame,
     network_summary: pd.DataFrame,
 ) -> None:
-    within_row = subject_effect_df[subject_effect_df["component"] == "within_mean_z"].iloc[0]
-    between_row = subject_effect_df[subject_effect_df["component"] == "between_mean_z"].iloc[0]
+    within_row = subject_effect_df[
+        subject_effect_df["component"] == "within_mean_z"
+    ].iloc[0]
+    between_row = subject_effect_df[
+        subject_effect_df["component"] == "between_mean_z"
+    ].iloc[0]
 
     largest_within_drop = (
         network_summary.sort_values("older_minus_young_within", ascending=True)
@@ -555,18 +613,30 @@ def main() -> None:
         categories=ordered_networks(network_df["network"].astype(str).tolist()),
         ordered=True,
     )
-    network_df = network_df.sort_values(["age_group", "age", "subject_id", "network"]).reset_index(drop=True)
+    network_df = network_df.sort_values(
+        ["age_group", "age", "subject_id", "network"]
+    ).reset_index(drop=True)
 
     subject_df = build_subject_component_table(network_df)
     subject_effect_df = build_subject_effect_table(subject_df)
     network_effect_df = build_network_effect_table(network_df)
     network_summary = build_network_component_summary(network_effect_df)
 
-    subject_df.to_csv(output_dir / "subject_component_summary.tsv", sep="\t", index=False)
-    network_df.to_csv(output_dir / "subject_network_components.tsv", sep="\t", index=False)
-    subject_effect_df.to_csv(output_dir / "overall_component_effects.tsv", sep="\t", index=False)
-    network_effect_df.to_csv(output_dir / "network_component_effects.tsv", sep="\t", index=False)
-    network_summary.to_csv(output_dir / "network_component_summary.tsv", sep="\t", index=False)
+    subject_df.to_csv(
+        output_dir / "subject_component_summary.tsv", sep="\t", index=False
+    )
+    network_df.to_csv(
+        output_dir / "subject_network_components.tsv", sep="\t", index=False
+    )
+    subject_effect_df.to_csv(
+        output_dir / "overall_component_effects.tsv", sep="\t", index=False
+    )
+    network_effect_df.to_csv(
+        output_dir / "network_component_effects.tsv", sep="\t", index=False
+    )
+    network_summary.to_csv(
+        output_dir / "network_component_summary.tsv", sep="\t", index=False
+    )
 
     pd.DataFrame(
         [
@@ -579,10 +649,18 @@ def main() -> None:
         ]
     ).to_csv(output_dir / "within_between_settings.tsv", sep="\t", index=False)
 
-    plot_subject_components(subject_df, figures_dir / "overall_within_between_by_group.png")
-    plot_network_means(network_summary, figures_dir / "network_within_between_means.png")
-    plot_network_age_effects(network_effect_df, figures_dir / "network_within_between_age_effects.png")
-    write_summary_markdown(output_dir / "within_between_summary.md", subject_effect_df, network_summary)
+    plot_subject_components(
+        subject_df, figures_dir / "overall_within_between_by_group.png"
+    )
+    plot_network_means(
+        network_summary, figures_dir / "network_within_between_means.png"
+    )
+    plot_network_age_effects(
+        network_effect_df, figures_dir / "network_within_between_age_effects.png"
+    )
+    write_summary_markdown(
+        output_dir / "within_between_summary.md", subject_effect_df, network_summary
+    )
 
     print(f"Wrote within/between tables to {output_dir}")
     print(f"Wrote within/between figures to {figures_dir}")

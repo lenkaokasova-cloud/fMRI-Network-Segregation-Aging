@@ -17,7 +17,6 @@ import math
 from pathlib import Path
 from statistics import mean, median
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SCRUB_FD_THRESHOLD = 0.5
 
@@ -69,7 +68,9 @@ def parse_float(value: str) -> float | None:
     return number
 
 
-def summarize_confounds(confounds_file: Path, scrub_fd_threshold: float) -> dict[str, object]:
+def summarize_confounds(
+    confounds_file: Path, scrub_fd_threshold: float
+) -> dict[str, object]:
     with confounds_file.open() as f:
         reader = csv.DictReader(f, delimiter="\t")
         rows = list(reader)
@@ -90,7 +91,6 @@ def summarize_confounds(confounds_file: Path, scrub_fd_threshold: float) -> dict
     ]
     nonsteady_count = 0
     scrubbed_count = 0
-    # For this simple QC summary, I treat non-steady-state volumes and FD spikes as scrubbed.
     for row in rows:
         flagged = any(row.get(col, "") == "1" for col in nonsteady_columns)
         if flagged:
@@ -111,13 +111,17 @@ def summarize_confounds(confounds_file: Path, scrub_fd_threshold: float) -> dict
         "median_fd": round(median(fd_valid), 6) if fd_valid else "",
         "max_fd": round(max(fd_valid), 6) if fd_valid else "",
         "n_fd_gt_0p2": sum(x > 0.2 for x in fd_valid),
-        "pct_fd_gt_0p2": round(100 * sum(x > 0.2 for x in fd_valid) / len(fd_valid), 2)
-        if fd_valid
-        else "",
+        "pct_fd_gt_0p2": (
+            round(100 * sum(x > 0.2 for x in fd_valid) / len(fd_valid), 2)
+            if fd_valid
+            else ""
+        ),
         "n_fd_gt_0p5": sum(x > 0.5 for x in fd_valid),
-        "pct_fd_gt_0p5": round(100 * sum(x > 0.5 for x in fd_valid) / len(fd_valid), 2)
-        if fd_valid
-        else "",
+        "pct_fd_gt_0p5": (
+            round(100 * sum(x > 0.5 for x in fd_valid) / len(fd_valid), 2)
+            if fd_valid
+            else ""
+        ),
         "scrub_fd_threshold": round(scrub_fd_threshold, 3),
         "n_scrubbed": scrubbed_count,
         "pct_scrubbed": round(100 * scrubbed_count / len(rows), 2),
@@ -137,7 +141,9 @@ def main() -> None:
     if not confounds_files:
         raise FileNotFoundError(f"No confounds files found in {func_dir}")
 
-    summaries = [summarize_confounds(path, args.scrub_fd_threshold) for path in confounds_files]
+    summaries = [
+        summarize_confounds(path, args.scrub_fd_threshold) for path in confounds_files
+    ]
 
     output_path = (
         Path(args.output)

@@ -10,7 +10,7 @@
 #      higher-order networks
 #   3. a network-specific model across the individual Yeo 7 networks
 #   In these models, sex and mean FD are included as covariates.
-#   The script also writes summary tables and dissertation-style figures.
+#   The script also writes summary tables and figures.
 # How to run it:
 #   Run from the repo root with:
 #   python code/primary/12_run_age_group_analysis.py
@@ -28,13 +28,14 @@ import os
 import sys
 from pathlib import Path
 
-os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve()))
+os.environ.setdefault(
+    "MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve())
+)
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -51,7 +52,9 @@ from dissertation_figure_style import (
     YOUNG_COLOR,
     apply_dissertation_rcparams,
     darken_axis_text,
-    save_figure as save_dissertation_figure,
+)
+from dissertation_figure_style import save_figure as save_dissertation_figure
+from dissertation_figure_style import (
     style_spines,
 )
 
@@ -103,7 +106,6 @@ def resolve_project_path(path_str: str) -> Path:
 
 
 def add_network_type(df: pd.DataFrame) -> pd.DataFrame:
-    # This collapses the 7 networks into the broad higher-order vs sensory/motor split used later on.
     out = df.copy()
     out["network_type"] = "other"
     out.loc[out["network"].isin(HIGHER_ORDER), "network_type"] = "higher_order"
@@ -111,8 +113,9 @@ def add_network_type(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def merge_missing_columns(df: pd.DataFrame, sample: pd.DataFrame, required_columns: list[str]) -> pd.DataFrame:
-    # Some outputs already carry metadata, but I backfill from the sample table when needed so everything stays aligned.
+def merge_missing_columns(
+    df: pd.DataFrame, sample: pd.DataFrame, required_columns: list[str]
+) -> pd.DataFrame:
     missing = [column for column in required_columns if column not in df.columns]
     if not missing:
         return df.copy()
@@ -194,7 +197,10 @@ def group_offsets(n_points: int, width: float = 0.12) -> np.ndarray:
 def plot_global_by_group(df: pd.DataFrame, outpath: Path) -> None:
     order = ["young", "older"]
     colors = [YOUNG_COLOR, OLDER_COLOR]
-    data = [df.loc[df["age_group"] == group, "global_segregation_prop"].to_numpy() for group in order]
+    data = [
+        df.loc[df["age_group"] == group, "global_segregation_prop"].to_numpy()
+        for group in order
+    ]
 
     fig, ax = plt.subplots(figsize=(6.8, 4.8))
     box = ax.boxplot(
@@ -257,9 +263,19 @@ def plot_motion_vs_global(df: pd.DataFrame, outpath: Path) -> None:
             zorder=3,
         )
         if len(subset) >= 2:
-            slope, intercept = np.polyfit(subset["mean_fd"], subset["global_segregation_prop"], 1)
-            x_values = np.linspace(subset["mean_fd"].min(), subset["mean_fd"].max(), 100)
-            ax.plot(x_values, slope * x_values + intercept, color=color, linewidth=1.8, alpha=0.9)
+            slope, intercept = np.polyfit(
+                subset["mean_fd"], subset["global_segregation_prop"], 1
+            )
+            x_values = np.linspace(
+                subset["mean_fd"].min(), subset["mean_fd"].max(), 100
+            )
+            ax.plot(
+                x_values,
+                slope * x_values + intercept,
+                color=color,
+                linewidth=1.8,
+                alpha=0.9,
+            )
 
     style_axis(
         ax,
@@ -296,13 +312,18 @@ def plot_network_type_summary(df: pd.DataFrame, outpath: Path) -> None:
     for age_group, color in [("young", YOUNG_COLOR), ("older", OLDER_COLOR)]:
         wide = (
             df[df["age_group"] == age_group]
-            .pivot(index="subject_id", columns="network_type", values="segregation_prop")
+            .pivot(
+                index="subject_id", columns="network_type", values="segregation_prop"
+            )
             .dropna()
         )
         if {"sensory_motor", "higher_order"}.issubset(wide.columns):
             for _, row in wide.iterrows():
                 ax.plot(
-                    [positions[(age_group, "sensory_motor")], positions[(age_group, "higher_order")]],
+                    [
+                        positions[(age_group, "sensory_motor")],
+                        positions[(age_group, "higher_order")],
+                    ],
                     [row["sensory_motor"], row["higher_order"]],
                     color=color,
                     alpha=0.18,
@@ -393,15 +414,21 @@ def write_summary_markdown(
         )
 
     lines.extend(["", "## Primary Models", ""])
-    global_term = describe_term(global_model, "C(age_group, Treatment(reference='young'))[T.older]")
+    global_term = describe_term(
+        global_model, "C(age_group, Treatment(reference='young'))[T.older]"
+    )
     if global_term:
-        lines.append(f"- Global model older-vs-young effect on proportional global segregation: {global_term}")
+        lines.append(
+            f"- Global model older-vs-young effect on proportional global segregation: {global_term}"
+        )
     interaction_term = describe_term(
         network_type_model,
         "C(age_group, Treatment(reference='young'))[T.older]:C(network_type, Treatment(reference='sensory_motor'))[T.higher_order]",
     )
     if interaction_term:
-        lines.append(f"- Network-type interaction on proportional segregation: {interaction_term}")
+        lines.append(
+            f"- Network-type interaction on proportional segregation: {interaction_term}"
+        )
 
     outpath.write_text("\n".join(lines) + "\n")
 
@@ -416,13 +443,24 @@ def main() -> None:
     figures_dir.mkdir(parents=True, exist_ok=True)
 
     sample = pd.read_csv(sample_path, sep="\t")
-    global_df = pd.read_csv(connectivity_dir / "subject_global_segregation.tsv", sep="\t")
-    network_df = pd.read_csv(connectivity_dir / "subject_network_segregation.tsv", sep="\t")
+    global_df = pd.read_csv(
+        connectivity_dir / "subject_global_segregation.tsv", sep="\t"
+    )
+    network_df = pd.read_csv(
+        connectivity_dir / "subject_network_segregation.tsv", sep="\t"
+    )
 
     global_df = merge_missing_columns(
         global_df,
         sample,
-        ["age", "sex", "age_group", "mean_fd", "pct_fd_gt_0p2", "n_retained_after_scrub"],
+        [
+            "age",
+            "sex",
+            "age_group",
+            "mean_fd",
+            "pct_fd_gt_0p2",
+            "n_retained_after_scrub",
+        ],
     )
     network_df = merge_missing_columns(
         network_df,
@@ -469,12 +507,20 @@ def main() -> None:
 
     global_table = model_to_table(global_model, "global_group_model")
     network_type_table = model_to_table(network_type_model, "network_type_model")
-    network_specific_table = model_to_table(network_specific_model, "network_specific_model")
+    network_specific_table = model_to_table(
+        network_specific_model, "network_specific_model"
+    )
 
     sample_summary.to_csv(output_dir / "sample_summary.tsv", sep="\t", index=False)
-    global_df.to_csv(output_dir / "subject_global_with_metadata.tsv", sep="\t", index=False)
-    network_df.to_csv(output_dir / "subject_network_with_metadata.tsv", sep="\t", index=False)
-    network_type_df.to_csv(output_dir / "subject_network_type_summary.tsv", sep="\t", index=False)
+    global_df.to_csv(
+        output_dir / "subject_global_with_metadata.tsv", sep="\t", index=False
+    )
+    network_df.to_csv(
+        output_dir / "subject_network_with_metadata.tsv", sep="\t", index=False
+    )
+    network_type_df.to_csv(
+        output_dir / "subject_network_type_summary.tsv", sep="\t", index=False
+    )
     pd.concat(
         [global_table, network_type_table, network_specific_table],
         ignore_index=True,
@@ -482,7 +528,9 @@ def main() -> None:
 
     plot_global_by_group(global_df, figures_dir / "global_segregation_by_group.png")
     plot_motion_vs_global(global_df, figures_dir / "motion_vs_global_segregation.png")
-    plot_network_type_summary(network_type_df, figures_dir / "network_type_by_group.png")
+    plot_network_type_summary(
+        network_type_df, figures_dir / "network_type_by_group.png"
+    )
     write_summary_markdown(
         output_dir / "analysis_summary.md",
         sample_summary,

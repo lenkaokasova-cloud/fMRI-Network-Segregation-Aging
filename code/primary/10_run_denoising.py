@@ -24,12 +24,11 @@ import argparse
 import json
 from pathlib import Path
 
+import nilearn
 import numpy as np
 import pandas as pd
-import nilearn
 from nilearn import datasets
 from nilearn.maskers import NiftiLabelsMasker
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SCRUB_FD_THRESHOLD = 0.5
@@ -84,12 +83,21 @@ def parse_args() -> argparse.Namespace:
         default="data/external/nilearn_data",
         help="Writable directory where Nilearn atlas files should be cached.",
     )
-    parser.add_argument("--n-rois", type=int, default=200, help="Number of Schaefer parcels.")
     parser.add_argument(
-        "--yeo-networks", type=int, default=7, help="Number of Yeo networks for the atlas."
+        "--n-rois", type=int, default=200, help="Number of Schaefer parcels."
     )
-    parser.add_argument("--high-pass", type=float, default=0.008, help="High-pass filter in Hz.")
-    parser.add_argument("--low-pass", type=float, default=0.09, help="Low-pass filter in Hz.")
+    parser.add_argument(
+        "--yeo-networks",
+        type=int,
+        default=7,
+        help="Number of Yeo networks for the atlas.",
+    )
+    parser.add_argument(
+        "--high-pass", type=float, default=0.008, help="High-pass filter in Hz."
+    )
+    parser.add_argument(
+        "--low-pass", type=float, default=0.09, help="Low-pass filter in Hz."
+    )
     parser.add_argument(
         "--scrub-fd-threshold",
         type=float,
@@ -143,7 +151,15 @@ def resolve_project_path(path_str: str) -> Path:
 
 def load_sample(sample_path: Path) -> pd.DataFrame:
     sample = pd.read_csv(sample_path, sep="\t")
-    required = {"subject_id", "age", "sex", "age_group", "mean_fd", "pct_fd_gt_0p2", "n_volumes"}
+    required = {
+        "subject_id",
+        "age",
+        "sex",
+        "age_group",
+        "mean_fd",
+        "pct_fd_gt_0p2",
+        "n_volumes",
+    }
     missing = required.difference(sample.columns)
     if missing:
         missing_str = ", ".join(sorted(missing))
@@ -151,7 +167,9 @@ def load_sample(sample_path: Path) -> pd.DataFrame:
     return sample
 
 
-def get_forward_run_paths(derivatives_dir: Path, subject: str) -> tuple[Path, Path, Path, Path]:
+def get_forward_run_paths(
+    derivatives_dir: Path, subject: str
+) -> tuple[Path, Path, Path, Path]:
     func_dir = derivatives_dir / subject / "ses-01" / "func"
     bold = next(
         func_dir.glob(
@@ -159,7 +177,9 @@ def get_forward_run_paths(derivatives_dir: Path, subject: str) -> tuple[Path, Pa
         )
     )
     confounds = next(
-        func_dir.glob(f"{subject}_ses-01_task-rest_dir-forward_desc-confounds_timeseries.tsv")
+        func_dir.glob(
+            f"{subject}_ses-01_task-rest_dir-forward_desc-confounds_timeseries.tsv"
+        )
     )
     bold_json = next(
         func_dir.glob(
@@ -167,7 +187,9 @@ def get_forward_run_paths(derivatives_dir: Path, subject: str) -> tuple[Path, Pa
         )
     )
     confounds_json = next(
-        func_dir.glob(f"{subject}_ses-01_task-rest_dir-forward_desc-confounds_timeseries.json")
+        func_dir.glob(
+            f"{subject}_ses-01_task-rest_dir-forward_desc-confounds_timeseries.json"
+        )
     )
     return bold, confounds, bold_json, confounds_json
 
@@ -190,9 +212,9 @@ def load_confounds_metadata(confounds_json: Path) -> dict[str, object]:
 
 
 def acompcor_summary(confounds_metadata: dict[str, object]) -> dict[str, object]:
-    keys = sorted(
-        [key for key in confounds_metadata if key.startswith("a_comp_cor_")]
-    )[:6]
+    keys = sorted([key for key in confounds_metadata if key.startswith("a_comp_cor_")])[
+        :6
+    ]
     if not keys:
         return {
             "acompcor_components_used": 0,
@@ -206,7 +228,13 @@ def acompcor_summary(confounds_metadata: dict[str, object]) -> dict[str, object]
     mean_var = float(
         np.nanmean([entry.get("VarianceExplained", float("nan")) for entry in entries])
     )
-    masks = sorted({str(entry.get("Mask", "")) for entry in entries if entry.get("Mask") is not None})
+    masks = sorted(
+        {
+            str(entry.get("Mask", ""))
+            for entry in entries
+            if entry.get("Mask") is not None
+        }
+    )
     return {
         "acompcor_components_used": len(keys),
         "acompcor_first6_cumulative_variance_explained": float(cumulative),
@@ -215,7 +243,9 @@ def acompcor_summary(confounds_metadata: dict[str, object]) -> dict[str, object]
     }
 
 
-def expand_spike_mask(spike_mask: np.ndarray, backward: int, forward: int) -> np.ndarray:
+def expand_spike_mask(
+    spike_mask: np.ndarray, backward: int, forward: int
+) -> np.ndarray:
     if backward <= 0 and forward <= 0:
         return spike_mask.copy()
     expanded = spike_mask.copy()
@@ -234,17 +264,24 @@ def build_sample_mask(
     fd_backward_neighbors: int,
     fd_forward_neighbors: int,
 ) -> tuple[np.ndarray, dict[str, object]]:
-    # This turns the confounds table into the keep-mask that decides which volumes survive cleaning.
     keep_mask = np.ones(len(confounds), dtype=bool)
-    dvars_column = "std_dvars" if "std_dvars" in confounds.columns else "dvars" if "dvars" in confounds.columns else ""
+    dvars_column = (
+        "std_dvars"
+        if "std_dvars" in confounds.columns
+        else "dvars" if "dvars" in confounds.columns else ""
+    )
     fd_spike_mask = np.zeros(len(confounds), dtype=bool)
     dvars_spike_mask = np.zeros(len(confounds), dtype=bool)
 
     nonsteady_columns = [
-        column for column in confounds.columns if column.startswith("non_steady_state_outlier")
+        column
+        for column in confounds.columns
+        if column.startswith("non_steady_state_outlier")
     ]
     if nonsteady_columns:
-        nonsteady_mask = confounds[nonsteady_columns].fillna(0.0).eq(0.0).all(axis=1).to_numpy()
+        nonsteady_mask = (
+            confounds[nonsteady_columns].fillna(0.0).eq(0.0).all(axis=1).to_numpy()
+        )
         keep_mask &= nonsteady_mask
         censored_nonsteady = int((~nonsteady_mask).sum())
     else:
@@ -271,19 +308,29 @@ def build_sample_mask(
         "censored_nonsteady_state_volumes": censored_nonsteady,
         "censored_fd_spike_volumes": int(fd_spike_mask.sum()),
         "censored_dvars_spike_volumes": int(dvars_spike_mask.sum()),
-        "censored_neighbor_expansion_volumes": int((expanded_spike_mask & ~spike_mask).sum()),
+        "censored_neighbor_expansion_volumes": int(
+            (expanded_spike_mask & ~spike_mask).sum()
+        ),
         "censored_total_volumes": int((~keep_mask).sum()),
     }
 
     return np.flatnonzero(keep_mask), summary
 
 
-def pick_confounds(confounds: pd.DataFrame, *, include_global_signal: bool) -> pd.DataFrame:
+def pick_confounds(
+    confounds: pd.DataFrame, *, include_global_signal: bool
+) -> pd.DataFrame:
     # These are the nuisance regressors that actually go into the cleaning step.
-    columns = [column for column in DEFAULT_CONFOUND_COLUMNS if column in confounds.columns]
+    columns = [
+        column for column in DEFAULT_CONFOUND_COLUMNS if column in confounds.columns
+    ]
     if include_global_signal:
-        columns.extend([column for column in GLOBAL_SIGNAL_COLUMNS if column in confounds.columns])
-    acompcor = [column for column in confounds.columns if column.startswith("a_comp_cor_")][:6]
+        columns.extend(
+            [column for column in GLOBAL_SIGNAL_COLUMNS if column in confounds.columns]
+        )
+    acompcor = [
+        column for column in confounds.columns if column.startswith("a_comp_cor_")
+    ][:6]
     columns.extend(acompcor)
     selected = confounds[columns].copy()
     return selected.fillna(0.0)
@@ -326,7 +373,9 @@ def main() -> None:
     if args.subjects:
         sample = sample[sample["subject_id"].isin(args.subjects)].copy()
     if sample.empty:
-        raise ValueError("No subjects remain to denoise after applying the requested filter.")
+        raise ValueError(
+            "No subjects remain to denoise after applying the requested filter."
+        )
 
     atlas = datasets.fetch_atlas_schaefer_2018(
         n_rois=args.n_rois,
@@ -334,7 +383,6 @@ def main() -> None:
         resolution_mm=2,
         data_dir=str(atlas_data_dir),
     )
-    # I save the atlas labels here as well so every downstream step knows exactly which parcel is which.
     atlas_labels = [decode_label(label) for label in atlas.labels]
     if len(atlas_labels) == args.n_rois + 1 and atlas_labels[0].lower() == "background":
         atlas_labels = atlas_labels[1:]
@@ -348,7 +396,9 @@ def main() -> None:
     ).to_csv(metrics_dir / "atlas_labels.tsv", sep="\t", index=False)
 
     subject_rows: list[dict[str, object]] = []
-    for row in sample.sort_values(["age_group", "age", "subject_id"]).itertuples(index=False):
+    for row in sample.sort_values(["age_group", "age", "subject_id"]).itertuples(
+        index=False
+    ):
         subject = row.subject_id
         bold_path, confounds_path, bold_json, confounds_json = get_forward_run_paths(
             derivatives_dir, subject
@@ -387,7 +437,6 @@ def main() -> None:
             t_r=tr,
             standardize_confounds=True,
         )
-        # Nilearn does the parcel extraction and the cleaning together here, using the subject's own TR.
         time_series = masker.fit_transform(
             str(bold_path),
             confounds=confounds,
@@ -459,7 +508,6 @@ def main() -> None:
             }
         ]
     ).to_csv(metrics_dir / "denoising_settings.tsv", sep="\t", index=False)
-    # I write the settings file so I can always show exactly what this denoising branch did.
 
     print(f"Denoised {len(subject_rows)} subjects from {sample_path}")
     print(f"Wrote denoised time series to {timeseries_dir}")

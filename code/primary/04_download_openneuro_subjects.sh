@@ -133,7 +133,6 @@ SUBJECTS=()
 for input in "${INPUTS[@]}"; do
   while IFS= read -r subject; do
     [[ -z "${subject}" ]] && continue
-    # This keeps the download queue unique even if the same subject shows up twice across inputs.
     append_unique_subject "${subject}"
   done < <(collect_subjects_from_arg "${input}")
 done

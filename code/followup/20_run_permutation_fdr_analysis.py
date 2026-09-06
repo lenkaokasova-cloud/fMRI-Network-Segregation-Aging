@@ -15,15 +15,24 @@ import argparse
 import os
 from pathlib import Path
 
-os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve()))
+os.environ.setdefault(
+    "MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve())
+)
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-NETWORK_ORDER = ["Vis", "SomMot", "DorsAttn", "SalVentAttn", "Limbic", "Cont", "Default"]
+NETWORK_ORDER = [
+    "Vis",
+    "SomMot",
+    "DorsAttn",
+    "SalVentAttn",
+    "Limbic",
+    "Cont",
+    "Default",
+]
 HIGHER_ORDER = {"Default", "Cont", "DorsAttn", "SalVentAttn"}
 SENSORY_MOTOR = {"Vis", "SomMot"}
 GLOBAL_SEGREGATION_COL = "global_segregation_prop"
@@ -136,14 +145,15 @@ def emphasize_summary_axis(ax: plt.Axes) -> None:
     ax.yaxis.label.set_fontsize(SUMMARY_AXIS_LABEL_SIZE)
     ax.title.set_fontsize(SUMMARY_TITLE_SIZE)
     ax.title.set_fontweight("bold")
-    ax.tick_params(axis="both", labelcolor=AXIS_TEXT_COLOR, length=4.2, width=0.8, color=TEXT_COLOR)
+    ax.tick_params(
+        axis="both", labelcolor=AXIS_TEXT_COLOR, length=4.2, width=0.8, color=TEXT_COLOR
+    )
     for label in ax.get_xticklabels() + ax.get_yticklabels():
         label.set_color(AXIS_TEXT_COLOR)
         label.set_fontsize(SUMMARY_TICK_LABEL_SIZE)
 
 
 def fdr_bh(p_values: np.ndarray) -> np.ndarray:
-    # I use BH-FDR here because we are testing several related effects and I want a cleaner multiple-testing correction.
     p_values = np.asarray(p_values, dtype=float)
     q_values = np.full_like(p_values, np.nan, dtype=float)
     finite_mask = np.isfinite(p_values)
@@ -167,13 +177,22 @@ def fdr_bh(p_values: np.ndarray) -> np.ndarray:
 def ordered_networks(networks: list[str]) -> list[str]:
     order_index = {network: idx for idx, network in enumerate(NETWORK_ORDER)}
     unique_networks = list(dict.fromkeys(networks))
-    return sorted(unique_networks, key=lambda name: (order_index.get(name, len(order_index)), name))
+    return sorted(
+        unique_networks,
+        key=lambda name: (order_index.get(name, len(order_index)), name),
+    )
 
 
-def load_tables(sample_path: Path, connectivity_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_tables(
+    sample_path: Path, connectivity_dir: Path
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     sample = pd.read_csv(sample_path, sep="\t")
-    global_df = pd.read_csv(connectivity_dir / "subject_global_segregation.tsv", sep="\t")
-    network_df = pd.read_csv(connectivity_dir / "subject_network_segregation.tsv", sep="\t")
+    global_df = pd.read_csv(
+        connectivity_dir / "subject_global_segregation.tsv", sep="\t"
+    )
+    network_df = pd.read_csv(
+        connectivity_dir / "subject_network_segregation.tsv", sep="\t"
+    )
 
     subject_ids = set(sample["subject_id"])
     global_df = global_df[global_df["subject_id"].isin(subject_ids)].copy()
@@ -182,7 +201,6 @@ def load_tables(sample_path: Path, connectivity_dir: Path) -> tuple[pd.DataFrame
 
 
 def encode_design(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
-    # The reduced design keeps the nuisance terms, and the full design adds the age-group effect I want to test.
     sex_male = df["sex"].astype(str).str.lower().eq("male").astype(float).to_numpy()
     age_older = df["age_group"].astype(str).eq("older").astype(float).to_numpy()
     mean_fd = df["mean_fd"].astype(float).to_numpy()
@@ -192,7 +210,9 @@ def encode_design(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     return x_full, x_reduced
 
 
-def ols_term_stats(y: np.ndarray, x: np.ndarray, term_index: int = 1) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def ols_term_stats(
+    y: np.ndarray, x: np.ndarray, term_index: int = 1
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     xtx_inv = np.linalg.inv(x.T @ x)
     beta = xtx_inv @ x.T @ y
     residuals = y - x @ beta
@@ -203,8 +223,9 @@ def ols_term_stats(y: np.ndarray, x: np.ndarray, term_index: int = 1) -> tuple[n
     return beta[term_index, :], se, t_values
 
 
-def hc3_term_interval(y: np.ndarray, x: np.ndarray, term_index: int = 1) -> dict[str, float]:
-    # This mirrors the main script's robust-HC3 uncertainty, while the p values still come from permutation.
+def hc3_term_interval(
+    y: np.ndarray, x: np.ndarray, term_index: int = 1
+) -> dict[str, float]:
     xtx_inv = np.linalg.inv(x.T @ x)
     beta = xtx_inv @ x.T @ y
     residuals = y - x @ beta
@@ -232,13 +253,14 @@ def freedman_lane_pvalues(
     seed: int,
     term_index: int = 1,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    # Freedman-Lane lets me test the age term while still keeping the nuisance covariates in place.
     rng = np.random.default_rng(seed)
 
     if y.ndim == 1:
         y = y[:, None]
 
-    observed_beta, observed_se, observed_t = ols_term_stats(y, x_full, term_index=term_index)
+    observed_beta, observed_se, observed_t = ols_term_stats(
+        y, x_full, term_index=term_index
+    )
 
     xr_inv = np.linalg.inv(x_reduced.T @ x_reduced)
     beta_reduced = xr_inv @ x_reduced.T @ y
@@ -261,7 +283,14 @@ def freedman_lane_pvalues(
 def build_subject_component_table(network_df: pd.DataFrame) -> pd.DataFrame:
     return (
         network_df.groupby(
-            ["subject_id", "age", "sex", "age_group", "mean_fd", "retained_minutes_after_scrub"],
+            [
+                "subject_id",
+                "age",
+                "sex",
+                "age_group",
+                "mean_fd",
+                "retained_minutes_after_scrub",
+            ],
             as_index=False,
         )
         .agg(
@@ -281,31 +310,48 @@ def build_interaction_difference_table(network_df: pd.DataFrame) -> pd.DataFrame
     df.loc[df["network"].isin(HIGHER_ORDER), "network_type"] = "higher_order"
     df = df[df["network_type"].isin(["sensory_motor", "higher_order"])].copy()
 
-    averaged = (
-        df.groupby(
-            ["subject_id", "age", "sex", "age_group", "mean_fd", "retained_minutes_after_scrub", "network_type"],
-            as_index=False,
-        )
-        .agg(
-            within_mean_z=("within_mean_z", "mean"),
-            between_mean_z=("between_mean_z", "mean"),
-            segregation_prop=(SEGREGATION_COL, "mean"),
-        )
+    averaged = df.groupby(
+        [
+            "subject_id",
+            "age",
+            "sex",
+            "age_group",
+            "mean_fd",
+            "retained_minutes_after_scrub",
+            "network_type",
+        ],
+        as_index=False,
+    ).agg(
+        within_mean_z=("within_mean_z", "mean"),
+        between_mean_z=("between_mean_z", "mean"),
+        segregation_prop=(SEGREGATION_COL, "mean"),
     )
 
     wide = averaged.pivot(
-        index=["subject_id", "age", "sex", "age_group", "mean_fd", "retained_minutes_after_scrub"],
+        index=[
+            "subject_id",
+            "age",
+            "sex",
+            "age_group",
+            "mean_fd",
+            "retained_minutes_after_scrub",
+        ],
         columns="network_type",
         values=["within_mean_z", "between_mean_z", SEGREGATION_COL],
     )
-    wide.columns = [f"{component}_{network_type}" for component, network_type in wide.columns]
+    wide.columns = [
+        f"{component}_{network_type}" for component, network_type in wide.columns
+    ]
     wide = wide.reset_index()
-    wide["within_diff_higher_minus_sensory"] = wide["within_mean_z_higher_order"] - wide["within_mean_z_sensory_motor"]
+    wide["within_diff_higher_minus_sensory"] = (
+        wide["within_mean_z_higher_order"] - wide["within_mean_z_sensory_motor"]
+    )
     wide["between_diff_higher_minus_sensory"] = (
         wide["between_mean_z_higher_order"] - wide["between_mean_z_sensory_motor"]
     )
     wide["segregation_diff_higher_minus_sensory"] = (
-        wide[f"{SEGREGATION_COL}_higher_order"] - wide[f"{SEGREGATION_COL}_sensory_motor"]
+        wide[f"{SEGREGATION_COL}_higher_order"]
+        - wide[f"{SEGREGATION_COL}_sensory_motor"]
     )
     return wide.sort_values(["age_group", "age", "subject_id"]).reset_index(drop=True)
 
@@ -321,12 +367,19 @@ def run_overall_permutation_analysis(
         ["subject_id", "age", "sex", "age_group", "mean_fd", GLOBAL_SEGREGATION_COL]
     ].merge(
         subject_component_df[
-            ["subject_id", "overall_within_mean", "overall_between_mean", "overall_segregation"]
+            [
+                "subject_id",
+                "overall_within_mean",
+                "overall_between_mean",
+                "overall_segregation",
+            ]
         ],
         on="subject_id",
         how="inner",
     )
-    merged = merged.sort_values(["age_group", "age", "subject_id"]).reset_index(drop=True)
+    merged = merged.sort_values(["age_group", "age", "subject_id"]).reset_index(
+        drop=True
+    )
     x_full, x_reduced = encode_design(merged)
     outcomes = [
         (GLOBAL_SEGREGATION_COL, "Global segregation"),
@@ -357,16 +410,20 @@ def run_overall_permutation_analysis(
                 "conf_high": robust_stats["conf_high"],
                 "permutation_p_value": float(perm_p[idx]),
                 "fdr_q_value": float(q_values[idx]),
-                "young_mean": float(merged.loc[merged["age_group"] == "young", column].mean()),
-                "older_mean": float(merged.loc[merged["age_group"] == "older", column].mean()),
+                "young_mean": float(
+                    merged.loc[merged["age_group"] == "young", column].mean()
+                ),
+                "older_mean": float(
+                    merged.loc[merged["age_group"] == "older", column].mean()
+                ),
                 "older_minus_young_mean": float(
                     merged.loc[merged["age_group"] == "older", column].mean()
                     - merged.loc[merged["age_group"] == "young", column].mean()
-                    ),
-                    "n_subjects": int(len(merged)),
-                    "ci_method": "HC3 model-based",
-                }
-            )
+                ),
+                "n_subjects": int(len(merged)),
+                "ci_method": "HC3 model-based",
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -404,7 +461,9 @@ def run_network_permutation_analysis(
         q_values = fdr_bh(perm_p)
 
         for idx, network in enumerate(outcome_columns):
-            robust_stats = hc3_term_interval(wide[network].to_numpy(dtype=float), x_full)
+            robust_stats = hc3_term_interval(
+                wide[network].to_numpy(dtype=float), x_full
+            )
             rows.append(
                 {
                     "component": component,
@@ -415,8 +474,12 @@ def run_network_permutation_analysis(
                     "conf_high": robust_stats["conf_high"],
                     "permutation_p_value": float(perm_p[idx]),
                     "fdr_q_value": float(q_values[idx]),
-                    "young_mean": float(wide.loc[wide["age_group"] == "young", network].mean()),
-                    "older_mean": float(wide.loc[wide["age_group"] == "older", network].mean()),
+                    "young_mean": float(
+                        wide.loc[wide["age_group"] == "young", network].mean()
+                    ),
+                    "older_mean": float(
+                        wide.loc[wide["age_group"] == "older", network].mean()
+                    ),
                     "older_minus_young_mean": float(
                         wide.loc[wide["age_group"] == "older", network].mean()
                         - wide.loc[wide["age_group"] == "young", network].mean()
@@ -428,7 +491,9 @@ def run_network_permutation_analysis(
 
     out = pd.DataFrame(rows)
     out["network"] = pd.Categorical(out["network"], categories=networks, ordered=True)
-    out["component"] = pd.Categorical(out["component"], categories=COMPONENT_ORDER, ordered=True)
+    out["component"] = pd.Categorical(
+        out["component"], categories=COMPONENT_ORDER, ordered=True
+    )
     return out.sort_values(["component", "network"]).reset_index(drop=True)
 
 
@@ -441,8 +506,14 @@ def run_interaction_difference_analysis(
     x_full, x_reduced = encode_design(interaction_df)
     outcomes = [
         ("within_diff_higher_minus_sensory", "Within higher-order minus sensory/motor"),
-        ("between_diff_higher_minus_sensory", "Between higher-order minus sensory/motor"),
-        ("segregation_diff_higher_minus_sensory", "Segregation higher-order minus sensory/motor"),
+        (
+            "between_diff_higher_minus_sensory",
+            "Between higher-order minus sensory/motor",
+        ),
+        (
+            "segregation_diff_higher_minus_sensory",
+            "Segregation higher-order minus sensory/motor",
+        ),
     ]
     y = interaction_df[[column for column, _ in outcomes]].to_numpy()
     beta, se, perm_p = freedman_lane_pvalues(
@@ -456,7 +527,9 @@ def run_interaction_difference_analysis(
 
     rows: list[dict[str, object]] = []
     for idx, (column, label) in enumerate(outcomes):
-        robust_stats = hc3_term_interval(interaction_df[column].to_numpy(dtype=float), x_full)
+        robust_stats = hc3_term_interval(
+            interaction_df[column].to_numpy(dtype=float), x_full
+        )
         rows.append(
             {
                 "outcome": column,
@@ -467,11 +540,23 @@ def run_interaction_difference_analysis(
                 "conf_high": robust_stats["conf_high"],
                 "permutation_p_value": float(perm_p[idx]),
                 "fdr_q_value": float(q_values[idx]),
-                "young_mean": float(interaction_df.loc[interaction_df["age_group"] == "young", column].mean()),
-                "older_mean": float(interaction_df.loc[interaction_df["age_group"] == "older", column].mean()),
+                "young_mean": float(
+                    interaction_df.loc[
+                        interaction_df["age_group"] == "young", column
+                    ].mean()
+                ),
+                "older_mean": float(
+                    interaction_df.loc[
+                        interaction_df["age_group"] == "older", column
+                    ].mean()
+                ),
                 "older_minus_young_mean": float(
-                    interaction_df.loc[interaction_df["age_group"] == "older", column].mean()
-                    - interaction_df.loc[interaction_df["age_group"] == "young", column].mean()
+                    interaction_df.loc[
+                        interaction_df["age_group"] == "older", column
+                    ].mean()
+                    - interaction_df.loc[
+                        interaction_df["age_group"] == "young", column
+                    ].mean()
                 ),
                 "n_subjects": int(len(interaction_df)),
                 "ci_method": "HC3 model-based",
@@ -483,13 +568,19 @@ def run_interaction_difference_analysis(
 def plot_network_qvalue_heatmap(network_results: pd.DataFrame, outpath: Path) -> None:
     plot_df = network_results.copy()
     pivot_q = plot_df.pivot(index="component", columns="network", values="fdr_q_value")
-    pivot_est = plot_df.pivot(index="component", columns="network", values="estimate_older_vs_young")
+    pivot_est = plot_df.pivot(
+        index="component", columns="network", values="estimate_older_vs_young"
+    )
 
-    pivot_q = pivot_q.loc[COMPONENT_ORDER, ordered_networks(plot_df["network"].astype(str).tolist())]
+    pivot_q = pivot_q.loc[
+        COMPONENT_ORDER, ordered_networks(plot_df["network"].astype(str).tolist())
+    ]
     pivot_est = pivot_est.loc[COMPONENT_ORDER, pivot_q.columns]
 
     fig, ax = plt.subplots(figsize=(9.2, 3.6))
-    signed_log_q = np.sign(pivot_est.to_numpy()) * -np.log10(np.clip(pivot_q.to_numpy(), 1e-12, 1.0))
+    signed_log_q = np.sign(pivot_est.to_numpy()) * -np.log10(
+        np.clip(pivot_q.to_numpy(), 1e-12, 1.0)
+    )
     vmax = max(1.3, float(np.nanmax(np.abs(signed_log_q))))
     im = ax.imshow(signed_log_q, cmap="coolwarm", vmin=-vmax, vmax=vmax, aspect="auto")
 
@@ -509,10 +600,12 @@ def plot_network_qvalue_heatmap(network_results: pd.DataFrame, outpath: Path) ->
     for row_idx, component in enumerate(pivot_q.index):
         for col_idx, network in enumerate(pivot_q.columns):
             q_value = pivot_q.loc[component, network]
+            estimate = pivot_est.loc[component, network]
+            direction_label = "b < 0" if estimate < 0 else "b > 0"
             ax.text(
                 col_idx,
                 row_idx,
-                f"{q_value:.2f}",
+                f"q = {q_value:.2f}\n{direction_label}",
                 ha="center",
                 va="center",
                 color=AXIS_TEXT_COLOR,
@@ -520,7 +613,11 @@ def plot_network_qvalue_heatmap(network_results: pd.DataFrame, outpath: Path) ->
             )
 
     cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label("Signed -log10(q)", fontsize=SUMMARY_AXIS_LABEL_SIZE, color=AXIS_TEXT_COLOR)
+    cbar.set_label(
+        "Signed -log10(q)\n(sign of older − younger b)",
+        fontsize=SUMMARY_AXIS_LABEL_SIZE,
+        color=AXIS_TEXT_COLOR,
+    )
     cbar.ax.tick_params(labelsize=SUMMARY_TICK_LABEL_SIZE, colors=AXIS_TEXT_COLOR)
     cbar.outline.set_edgecolor(TEXT_COLOR)
     cbar.outline.set_linewidth(0.9)
@@ -554,7 +651,9 @@ def write_summary(
         subset = network_results[network_results["component"] == component].copy()
         significant = subset[subset["fdr_q_value"] < 0.05].copy()
         if significant.empty:
-            lines.append(f"- {COMPONENT_LABELS[component]}: no networks survived FDR correction.")
+            lines.append(
+                f"- {COMPONENT_LABELS[component]}: no networks survived FDR correction."
+            )
         else:
             joined = ", ".join(
                 f"{row['network']} (q={row['fdr_q_value']:.4g}, estimate={row['estimate_older_vs_young']:.4f})"
@@ -613,9 +712,17 @@ def main() -> None:
         seed=args.seed,
     )
 
-    overall_results.to_csv(output_dir / "overall_permutation_summary.tsv", sep="\t", index=False)
-    network_results.to_csv(output_dir / "network_permutation_summary.tsv", sep="\t", index=False)
-    interaction_results.to_csv(output_dir / "interaction_difference_permutation_summary.tsv", sep="\t", index=False)
+    overall_results.to_csv(
+        output_dir / "overall_permutation_summary.tsv", sep="\t", index=False
+    )
+    network_results.to_csv(
+        output_dir / "network_permutation_summary.tsv", sep="\t", index=False
+    )
+    interaction_results.to_csv(
+        output_dir / "interaction_difference_permutation_summary.tsv",
+        sep="\t",
+        index=False,
+    )
 
     settings = pd.DataFrame(
         [
@@ -623,14 +730,25 @@ def main() -> None:
             {"setting": "connectivity_dir", "value": str(connectivity_dir)},
             {"setting": "n_permutations", "value": args.n_permutations},
             {"setting": "seed", "value": args.seed},
-            {"setting": "permutation_method", "value": "Freedman-Lane residual permutation"},
-            {"setting": "network_fdr_family", "value": "7 networks within each component family"},
-            {"setting": "interaction_fdr_family", "value": "3 higher-order minus sensory/motor component difference tests"},
+            {
+                "setting": "permutation_method",
+                "value": "Freedman-Lane residual permutation",
+            },
+            {
+                "setting": "network_fdr_family",
+                "value": "7 networks within each component family",
+            },
+            {
+                "setting": "interaction_fdr_family",
+                "value": "3 higher-order minus sensory/motor component difference tests",
+            },
         ]
     )
     settings.to_csv(output_dir / "permutation_settings.tsv", sep="\t", index=False)
 
-    plot_network_qvalue_heatmap(network_results, figures_dir / "network_permutation_qvalues.png")
+    plot_network_qvalue_heatmap(
+        network_results, figures_dir / "network_permutation_qvalues.png"
+    )
     write_summary(
         overall_results,
         network_results,

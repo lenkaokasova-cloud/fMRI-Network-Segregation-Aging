@@ -17,16 +17,17 @@ import os
 import sys
 from pathlib import Path
 
-os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve()))
+os.environ.setdefault(
+    "MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve())
+)
 
 import matplotlib.pyplot as plt
+import nibabel as nib
 import numpy as np
 import pandas as pd
-import nibabel as nib
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 from nilearn import datasets, image, plotting
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -35,12 +36,20 @@ if str(PROJECT_ROOT) not in sys.path:
 from dissertation_figure_style import (
     AXIS_TEXT_COLOR,
     TEXT_COLOR,
-    TITLE_SIZE,
     TICK_SIZE,
+    TITLE_SIZE,
     apply_dissertation_rcparams,
 )
 
-NETWORK_ORDER = ["Vis", "SomMot", "DorsAttn", "SalVentAttn", "Limbic", "Cont", "Default"]
+NETWORK_ORDER = [
+    "Vis",
+    "SomMot",
+    "DorsAttn",
+    "SalVentAttn",
+    "Limbic",
+    "Cont",
+    "Default",
+]
 NETWORK_COLORS = [
     "#4E79A7",
     "#59A14F",
@@ -234,8 +243,9 @@ def parse_network_name(label: str) -> str:
     return label
 
 
-def build_network_level_atlas(atlas_img: str, atlas_labels: list[str]) -> nib.Nifti1Image:
-    # For visual QC I collapse parcels up to the 7 network labels so the overlay is easier to read.
+def build_network_level_atlas(
+    atlas_img: str, atlas_labels: list[str]
+) -> nib.Nifti1Image:
     atlas_nii = nib.load(atlas_img)
     atlas_data = atlas_nii.get_fdata()
     network_data = np.zeros(atlas_data.shape, dtype=np.int16)
@@ -322,7 +332,6 @@ def save_dissertation_network_figure(
     cut_coords: list[float] | tuple[float, ...],
     alpha: float,
 ) -> None:
-    # This is the cleaner figure version I would actually keep for the dissertation.
     cmap = ListedColormap(NETWORK_COLORS)
     panel_titles = ["Sagittal", "Coronal", "Axial"]
     display_modes = ["x", "y", "z"]
@@ -346,7 +355,9 @@ def save_dissertation_network_figure(
             black_bg=False,
             cmap=cmap,
         )
-        ax.set_title(panel_title, fontsize=11, pad=10, color=AXIS_TEXT_COLOR, fontweight="bold")
+        ax.set_title(
+            panel_title, fontsize=11, pad=10, color=AXIS_TEXT_COLOR, fontweight="bold"
+        )
         display.close()
 
     legend_handles = [
@@ -400,7 +411,9 @@ def main() -> None:
         missing = requested.difference(set(sample["subject_id"]))
         if missing:
             missing_str = ", ".join(sorted(missing))
-            raise ValueError(f"Requested subjects not found in sample TSV: {missing_str}")
+            raise ValueError(
+                f"Requested subjects not found in sample TSV: {missing_str}"
+            )
 
     if sample.empty:
         raise ValueError("No subjects remain to inspect.")
@@ -411,7 +424,6 @@ def main() -> None:
         resolution_mm=args.resolution_mm,
         data_dir=str(atlas_data_dir),
     )
-    # I fetch the exact atlas version used later in extraction so the visual check matches the analysis.
     atlas_labels = [decode_label(label) for label in atlas.labels]
     if len(atlas_labels) == args.n_rois + 1 and atlas_labels[0].lower() == "background":
         atlas_labels = atlas_labels[1:]
@@ -424,7 +436,6 @@ def main() -> None:
     summary_rows: list[dict[str, object]] = []
 
     for subject in sorted(sample["subject_id"].tolist()):
-        # I check every subject separately here so the saved figures double as a record of the QC step.
         bold_path = get_forward_bold_path(derivatives_dir, subject)
         if bold_path is None:
             raise FileNotFoundError(
@@ -492,7 +503,11 @@ def main() -> None:
                 args.show,
             )
         if args.save_dissertation_figure:
-            clean_bg_img = str(t1w_path) if t1w_path is not None else image.mean_img(str(bold_path))
+            clean_bg_img = (
+                str(t1w_path)
+                if t1w_path is not None
+                else image.mean_img(str(bold_path))
+            )
             save_dissertation_network_figure(
                 network_atlas,
                 subject,
@@ -515,7 +530,9 @@ def main() -> None:
         summary_row = {
             "subject_id": subject,
             "forward_bold_file": relative_project_path(bold_path),
-            "mni_t1w_file": relative_project_path(t1w_path) if t1w_path is not None else "",
+            "mni_t1w_file": (
+                relative_project_path(t1w_path) if t1w_path is not None else ""
+            ),
             "atlas": f"Schaefer{args.n_rois}_Yeo{args.yeo_networks}",
             "atlas_resolution_mm": args.resolution_mm,
             "primary_qc_figure_file": primary_qc_path,
@@ -527,7 +544,9 @@ def main() -> None:
             summary_row["coronal_figure_file"] = relative_project_path(coronal_path)
             summary_row["axial_figure_file"] = relative_project_path(axial_path)
         if args.save_clean_network_figure:
-            summary_row["clean_network_figure_file"] = relative_project_path(clean_network_path)
+            summary_row["clean_network_figure_file"] = relative_project_path(
+                clean_network_path
+            )
         summary_rows.append(summary_row)
 
     summary_path = output_dir / "atlas_overlay_summary.tsv"
@@ -542,7 +561,9 @@ def main() -> None:
         saved_figure_types.append("clean_network")
     if args.save_dissertation_figure:
         saved_figure_types.append("main_qc")
-    saved_figure_types_str = ", ".join(saved_figure_types) if saved_figure_types else "none"
+    saved_figure_types_str = (
+        ", ".join(saved_figure_types) if saved_figure_types else "none"
+    )
 
     print(f"Saved {len(summary_rows)} atlas overlay QC set(s) to {figures_dir}")
     print(f"Saved figure types: {saved_figure_types_str}")

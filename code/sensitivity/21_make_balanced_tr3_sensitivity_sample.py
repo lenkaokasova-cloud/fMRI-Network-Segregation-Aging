@@ -19,7 +19,6 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import linear_sum_assignment
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MATCH_COLUMNS = ["mean_fd", "retained_minutes_after_scrub"]
 
@@ -69,7 +68,6 @@ def resolve_project_path(path_str: str) -> Path:
 
 
 def zscore_frame(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
-    # I z-score the matching columns first so FD and retained minutes contribute on the same scale.
     out = df.copy()
     for column in columns:
         mean = out[column].mean()
@@ -105,7 +103,6 @@ def pair_within_sex(
     selected_young: list[str] = []
     pair_id = pair_start
     for oi, yi in zip(older_idx.tolist(), young_idx.tolist(), strict=True):
-        # Each older participant gets the closest younger match within the same sex group.
         older_row = older_df.iloc[oi]
         young_row = young_df.iloc[yi]
         pair_rows.append(
@@ -265,8 +262,8 @@ def main() -> None:
         pair_rows.extend(rows)
         selected_young_ids.extend(ids)
 
-    pairs_df = pd.DataFrame(pair_rows).sort_values(["balanced_pair_id"]).reset_index(
-        drop=True
+    pairs_df = (
+        pd.DataFrame(pair_rows).sort_values(["balanced_pair_id"]).reset_index(drop=True)
     )
     pair_map = {}
     for row in pairs_df.itertuples(index=False):

@@ -16,13 +16,14 @@ import os
 import sys
 from pathlib import Path
 
-os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve()))
+os.environ.setdefault(
+    "MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve())
+)
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -40,11 +41,21 @@ from dissertation_figure_style import (
     YOUNG_COLOR,
     apply_dissertation_rcparams,
     darken_axis_text,
-    save_figure as save_dissertation_figure,
+)
+from dissertation_figure_style import save_figure as save_dissertation_figure
+from dissertation_figure_style import (
     style_spines,
 )
 
-NETWORK_ORDER = ["Vis", "SomMot", "DorsAttn", "SalVentAttn", "Limbic", "Cont", "Default"]
+NETWORK_ORDER = [
+    "Vis",
+    "SomMot",
+    "DorsAttn",
+    "SalVentAttn",
+    "Limbic",
+    "Cont",
+    "Default",
+]
 TITLE_SIZE = 15
 LABEL_SIZE = 12
 TICK_SIZE = 11
@@ -115,7 +126,10 @@ def resolve_project_path(path_str: str) -> Path:
 def ordered_networks(networks: list[str]) -> list[str]:
     order_index = {network: idx for idx, network in enumerate(NETWORK_ORDER)}
     unique_networks = list(dict.fromkeys(networks))
-    return sorted(unique_networks, key=lambda name: (order_index.get(name, len(order_index)), name))
+    return sorted(
+        unique_networks,
+        key=lambda name: (order_index.get(name, len(order_index)), name),
+    )
 
 
 def style_axis(
@@ -148,10 +162,16 @@ def save_figure(fig: plt.Figure, outpath: Path) -> None:
     save_dissertation_figure(fig, outpath, dpi=FIG_DPI)
 
 
-def load_tables(sample_path: Path, connectivity_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_tables(
+    sample_path: Path, connectivity_dir: Path
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     sample = pd.read_csv(sample_path, sep="\t")
-    global_df = pd.read_csv(connectivity_dir / "subject_global_segregation.tsv", sep="\t")
-    network_df = pd.read_csv(connectivity_dir / "subject_network_segregation.tsv", sep="\t")
+    global_df = pd.read_csv(
+        connectivity_dir / "subject_global_segregation.tsv", sep="\t"
+    )
+    network_df = pd.read_csv(
+        connectivity_dir / "subject_network_segregation.tsv", sep="\t"
+    )
 
     subject_ids = set(sample["subject_id"])
     global_df = global_df[global_df["subject_id"].isin(subject_ids)].copy()
@@ -189,7 +209,6 @@ def effect_row(
     outcome: str,
     data: pd.DataFrame,
 ) -> dict[str, object]:
-    # I keep one shared formatter for effect rows so every robustness branch is summarized in the same way.
     estimate = float(result.params[term])
     std_error = float(result.bse[term])
     return {
@@ -207,7 +226,9 @@ def effect_row(
             - data.loc[data["age_group"] == "young", outcome].mean()
         ),
         "n_subjects": int(data["subject_id"].nunique()),
-        "n_younger": int(data.loc[data["age_group"] == "young", "subject_id"].nunique()),
+        "n_younger": int(
+            data.loc[data["age_group"] == "young", "subject_id"].nunique()
+        ),
         "n_older": int(data.loc[data["age_group"] == "older", "subject_id"].nunique()),
     }
 
@@ -217,7 +238,9 @@ def run_metric_sensitivity_global(global_df: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for outcome, label in GLOBAL_METRICS.items():
         result = fit_global_model(global_df, outcome)
-        rows.append(effect_row(result, term=term, label=label, outcome=outcome, data=global_df))
+        rows.append(
+            effect_row(result, term=term, label=label, outcome=outcome, data=global_df)
+        )
     return pd.DataFrame(rows)
 
 
@@ -229,7 +252,9 @@ def run_metric_sensitivity_network(network_df: pd.DataFrame) -> pd.DataFrame:
         for network in networks:
             subset = network_df[network_df["network"] == network].copy()
             result = fit_network_model(network_df, outcome, network)
-            row = effect_row(result, term=term, label=label, outcome=outcome, data=subset)
+            row = effect_row(
+                result, term=term, label=label, outcome=outcome, data=subset
+            )
             row["network"] = network
             rows.append(row)
     out = pd.DataFrame(rows)
@@ -238,9 +263,10 @@ def run_metric_sensitivity_network(network_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def run_leave_one_older_out(global_df: pd.DataFrame, outcome: str) -> pd.DataFrame:
-    # This checks whether one particular older participant is carrying too much of the global effect.
     term = "C(age_group, Treatment(reference='young'))[T.older]"
-    older_subjects = sorted(global_df.loc[global_df["age_group"] == "older", "subject_id"].unique())
+    older_subjects = sorted(
+        global_df.loc[global_df["age_group"] == "older", "subject_id"].unique()
+    )
     rows: list[dict[str, object]] = []
     for subject_id in older_subjects:
         subset = global_df[global_df["subject_id"] != subject_id].copy()
@@ -256,7 +282,9 @@ def run_leave_one_older_out(global_df: pd.DataFrame, outcome: str) -> pd.DataFra
                 "n_subjects": int(subset["subject_id"].nunique()),
             }
         )
-    return pd.DataFrame(rows).sort_values("estimate_older_vs_young").reset_index(drop=True)
+    return (
+        pd.DataFrame(rows).sort_values("estimate_older_vs_young").reset_index(drop=True)
+    )
 
 
 def run_stricter_motion_sensitivity(
@@ -279,7 +307,9 @@ def run_stricter_motion_sensitivity(
         if subset["age_group"].nunique() < 2:
             continue
         result = fit_global_model(subset, outcome)
-        row = effect_row(result, term=term, label=subset_name, outcome=outcome, data=subset)
+        row = effect_row(
+            result, term=term, label=subset_name, outcome=outcome, data=subset
+        )
         row["subset"] = subset_name
         row["strict_max_mean_fd"] = strict_max_mean_fd
         row["strict_max_pct_fd_gt_0p2"] = strict_max_pct_fd_gt_0p2
@@ -287,7 +317,9 @@ def run_stricter_motion_sensitivity(
     return pd.DataFrame(rows)
 
 
-def run_retained_minutes_covariate_sensitivity(global_df: pd.DataFrame, outcome: str) -> pd.DataFrame:
+def run_retained_minutes_covariate_sensitivity(
+    global_df: pd.DataFrame, outcome: str
+) -> pd.DataFrame:
     term = "C(age_group, Treatment(reference='young'))[T.older]"
     base_result = fit_global_model(global_df, outcome)
     retained_result = fit_global_model_with_retained_minutes(global_df, outcome)
@@ -296,7 +328,9 @@ def run_retained_minutes_covariate_sensitivity(global_df: pd.DataFrame, outcome:
         ("base_model", base_result),
         ("with_retained_minutes_covariate", retained_result),
     ]:
-        row = effect_row(result, term=term, label=label, outcome=outcome, data=global_df)
+        row = effect_row(
+            result, term=term, label=label, outcome=outcome, data=global_df
+        )
         row["model_variant"] = label
         rows.append(row)
     return pd.DataFrame(rows)
@@ -442,7 +476,9 @@ def main() -> None:
 
     global_metric_results = run_metric_sensitivity_global(global_df)
     network_metric_results = run_metric_sensitivity_network(network_df)
-    leave_one_out_results = run_leave_one_older_out(global_df, "global_segregation_prop")
+    leave_one_out_results = run_leave_one_older_out(
+        global_df, "global_segregation_prop"
+    )
     stricter_motion_results = run_stricter_motion_sensitivity(
         global_df,
         strict_max_mean_fd=args.strict_max_mean_fd,
@@ -454,10 +490,18 @@ def main() -> None:
         "global_segregation_prop",
     )
 
-    global_metric_results.to_csv(output_dir / "global_metric_sensitivity.tsv", sep="\t", index=False)
-    network_metric_results.to_csv(output_dir / "network_metric_sensitivity.tsv", sep="\t", index=False)
-    leave_one_out_results.to_csv(output_dir / "leave_one_older_out_global.tsv", sep="\t", index=False)
-    stricter_motion_results.to_csv(output_dir / "stricter_motion_global.tsv", sep="\t", index=False)
+    global_metric_results.to_csv(
+        output_dir / "global_metric_sensitivity.tsv", sep="\t", index=False
+    )
+    network_metric_results.to_csv(
+        output_dir / "network_metric_sensitivity.tsv", sep="\t", index=False
+    )
+    leave_one_out_results.to_csv(
+        output_dir / "leave_one_older_out_global.tsv", sep="\t", index=False
+    )
+    stricter_motion_results.to_csv(
+        output_dir / "stricter_motion_global.tsv", sep="\t", index=False
+    )
     retained_minutes_results.to_csv(
         output_dir / "retained_minutes_covariate_global.tsv",
         sep="\t",

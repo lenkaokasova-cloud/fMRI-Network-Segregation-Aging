@@ -16,13 +16,14 @@ import os
 import sys
 from pathlib import Path
 
-os.environ.setdefault("MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve()))
+os.environ.setdefault(
+    "MPLCONFIGDIR", str((Path("data/processed/.matplotlib")).resolve())
+)
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -40,7 +41,9 @@ from dissertation_figure_style import (
     YOUNG_COLOR,
     apply_dissertation_rcparams,
     darken_axis_text,
-    save_figure as save_dissertation_figure,
+)
+from dissertation_figure_style import save_figure as save_dissertation_figure
+from dissertation_figure_style import (
     style_spines,
 )
 
@@ -142,9 +145,13 @@ def group_offsets(n_points: int, width: float = 0.12) -> np.ndarray:
     return np.linspace(-width, width, n_points)
 
 
-def load_tables(sample_path: Path, connectivity_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_tables(
+    sample_path: Path, connectivity_dir: Path
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     sample = pd.read_csv(sample_path, sep="\t")
-    network_df = pd.read_csv(connectivity_dir / "subject_network_segregation.tsv", sep="\t")
+    network_df = pd.read_csv(
+        connectivity_dir / "subject_network_segregation.tsv", sep="\t"
+    )
 
     sample_subjects = set(sample["subject_id"])
     network_df = network_df[network_df["subject_id"].isin(sample_subjects)].copy()
@@ -152,20 +159,29 @@ def load_tables(sample_path: Path, connectivity_dir: Path) -> tuple[pd.DataFrame
 
 
 def add_network_type(network_df: pd.DataFrame) -> pd.DataFrame:
-    # This reduces the 7 networks into the higher-order vs sensory/motor contrast that the ageing literature often talks about.
     out = network_df.copy()
     out["network_type"] = "other"
     out.loc[out["network"].isin(SENSORY_MOTOR), "network_type"] = "sensory_motor"
     out.loc[out["network"].isin(HIGHER_ORDER), "network_type"] = "higher_order"
     out = out[out["network_type"].isin(NETWORK_TYPE_ORDER)].copy()
-    out["network_type"] = pd.Categorical(out["network_type"], categories=NETWORK_TYPE_ORDER, ordered=True)
+    out["network_type"] = pd.Categorical(
+        out["network_type"], categories=NETWORK_TYPE_ORDER, ordered=True
+    )
     return out
 
 
 def build_subject_network_type_components(network_df: pd.DataFrame) -> pd.DataFrame:
     return (
         network_df.groupby(
-            ["subject_id", "age", "sex", "age_group", "mean_fd", "retained_minutes_after_scrub", "network_type"],
+            [
+                "subject_id",
+                "age",
+                "sex",
+                "age_group",
+                "mean_fd",
+                "retained_minutes_after_scrub",
+                "network_type",
+            ],
             as_index=False,
         )
         .agg(
@@ -179,26 +195,28 @@ def build_subject_network_type_components(network_df: pd.DataFrame) -> pd.DataFr
 
 
 def build_descriptive_table(df: pd.DataFrame) -> pd.DataFrame:
-    summary = (
-        df.groupby(["component", "network_type", "age_group"], as_index=False)
-        .agg(mean_value=("value", "mean"), sd_value=("value", "std"), n=("value", "size"))
-    )
-    wide = summary.pivot(index=["component", "network_type"], columns="age_group", values="mean_value").reset_index()
+    summary = df.groupby(
+        ["component", "network_type", "age_group"], as_index=False
+    ).agg(mean_value=("value", "mean"), sd_value=("value", "std"), n=("value", "size"))
+    wide = summary.pivot(
+        index=["component", "network_type"], columns="age_group", values="mean_value"
+    ).reset_index()
     wide = wide.rename(columns={"young": "young_mean", "older": "older_mean"})
     wide["older_minus_young"] = wide["older_mean"] - wide["young_mean"]
-    return wide.merge(summary, on=["component", "network_type"], how="left").sort_values(
-        ["component", "network_type", "age_group"]
-    )
+    return wide.merge(
+        summary, on=["component", "network_type"], how="left"
+    ).sort_values(["component", "network_type", "age_group"])
 
 
 def fit_component_model(df: pd.DataFrame, component: str):
-    # The interaction model tests whether the age effect is different in higher-order systems than in sensory/motor ones.
     formula = (
         "value ~ C(age_group, Treatment(reference='young')) * "
         "C(network_type, Treatment(reference='sensory_motor')) + C(sex) + mean_fd"
     )
     subset = df[df["component"] == component].copy()
-    return smf.ols(formula, data=subset).fit(cov_type="cluster", cov_kwds={"groups": subset["subject_id"]})
+    return smf.ols(formula, data=subset).fit(
+        cov_type="cluster", cov_kwds={"groups": subset["subject_id"]}
+    )
 
 
 def build_effect_table(df: pd.DataFrame) -> pd.DataFrame:
@@ -208,7 +226,9 @@ def build_effect_table(df: pd.DataFrame) -> pd.DataFrame:
         "C(network_type, Treatment(reference='sensory_motor'))[T.higher_order]"
     )
     older_term = "C(age_group, Treatment(reference='young'))[T.older]"
-    higher_order_term = "C(network_type, Treatment(reference='sensory_motor'))[T.higher_order]"
+    higher_order_term = (
+        "C(network_type, Treatment(reference='sensory_motor'))[T.higher_order]"
+    )
 
     for component in COMPONENT_ORDER:
         result = fit_component_model(df, component)
@@ -260,7 +280,8 @@ def plot_component_panels(df: pd.DataFrame, outpath: Path) -> None:
         for age_group in ["young", "older"]:
             for network_type in NETWORK_TYPE_ORDER:
                 subset = component_df[
-                    (component_df["age_group"] == age_group) & (component_df["network_type"] == network_type)
+                    (component_df["age_group"] == age_group)
+                    & (component_df["network_type"] == network_type)
                 ].reset_index(drop=True)
                 box_data.append(subset["value"].to_numpy())
                 box_positions.append(positions[(age_group, network_type)])
@@ -291,7 +312,10 @@ def plot_component_panels(df: pd.DataFrame, outpath: Path) -> None:
             if {"sensory_motor", "higher_order"}.issubset(wide.columns):
                 for _, row in wide.iterrows():
                     ax.plot(
-                        [positions[(age_group, "sensory_motor")], positions[(age_group, "higher_order")]],
+                        [
+                            positions[(age_group, "sensory_motor")],
+                            positions[(age_group, "higher_order")],
+                        ],
                         [row["sensory_motor"], row["higher_order"]],
                         color="#9AA3AF",
                         linewidth=0.9,
@@ -302,11 +326,13 @@ def plot_component_panels(df: pd.DataFrame, outpath: Path) -> None:
         for age_group in ["young", "older"]:
             for network_type in NETWORK_TYPE_ORDER:
                 subset = component_df[
-                    (component_df["age_group"] == age_group) & (component_df["network_type"] == network_type)
+                    (component_df["age_group"] == age_group)
+                    & (component_df["network_type"] == network_type)
                 ].reset_index(drop=True)
                 offsets = group_offsets(len(subset))
                 ax.scatter(
-                    np.full(len(subset), positions[(age_group, network_type)]) + offsets,
+                    np.full(len(subset), positions[(age_group, network_type)])
+                    + offsets,
                     subset["value"],
                     color=YOUNG_COLOR if age_group == "young" else OLDER_COLOR,
                     s=58,
@@ -319,7 +345,9 @@ def plot_component_panels(df: pd.DataFrame, outpath: Path) -> None:
         style_axis(
             ax,
             title=COMPONENT_LABELS[component],
-            ylabel="Mean Fisher z" if component != SEGREGATION_COL else "Mean segregation",
+            ylabel=(
+                "Mean Fisher z" if component != SEGREGATION_COL else "Mean segregation"
+            ),
         )
         ax.set_xticks(xticks)
         ax.set_xticklabels(xlabels)
@@ -330,8 +358,12 @@ def plot_component_panels(df: pd.DataFrame, outpath: Path) -> None:
 
 
 def plot_interaction_effects(effect_df: pd.DataFrame, outpath: Path) -> None:
-    subset = effect_df[effect_df["interpretation"] == "additional_older_effect_in_higher_order"].copy()
-    subset["component"] = pd.Categorical(subset["component"], categories=COMPONENT_ORDER, ordered=True)
+    subset = effect_df[
+        effect_df["interpretation"] == "additional_older_effect_in_higher_order"
+    ].copy()
+    subset["component"] = pd.Categorical(
+        subset["component"], categories=COMPONENT_ORDER, ordered=True
+    )
     subset = subset.sort_values("component")
 
     fig, ax = plt.subplots(figsize=(7.0, 4.8))
@@ -352,7 +384,9 @@ def plot_interaction_effects(effect_df: pd.DataFrame, outpath: Path) -> None:
         markersize=7,
         zorder=3,
     )
-    ax.axhline(0, color=MUTED_REFERENCE_LINE_COLOR, linewidth=1.2, linestyle="--", zorder=1)
+    ax.axhline(
+        0, color=MUTED_REFERENCE_LINE_COLOR, linewidth=1.2, linestyle="--", zorder=1
+    )
     ax.set_xticks(x)
     ax.set_xticklabels([COMPONENT_LABELS[name] for name in subset["component"]])
     style_axis(
@@ -365,12 +399,20 @@ def plot_interaction_effects(effect_df: pd.DataFrame, outpath: Path) -> None:
     save_figure(fig, outpath)
 
 
-def write_summary(effect_df: pd.DataFrame, descriptive_df: pd.DataFrame, outpath: Path) -> None:
-    interaction = effect_df[effect_df["interpretation"] == "additional_older_effect_in_higher_order"].copy()
+def write_summary(
+    effect_df: pd.DataFrame, descriptive_df: pd.DataFrame, outpath: Path
+) -> None:
+    interaction = effect_df[
+        effect_df["interpretation"] == "additional_older_effect_in_higher_order"
+    ].copy()
     interaction = interaction.set_index("component")
     desc_wide = (
         descriptive_df[["component", "network_type", "age_group", "mean_value"]]
-        .pivot(index=["component", "network_type"], columns="age_group", values="mean_value")
+        .pivot(
+            index=["component", "network_type"],
+            columns="age_group",
+            values="mean_value",
+        )
         .reset_index()
     )
     desc_wide["older_minus_young"] = desc_wide["older"] - desc_wide["young"]
@@ -406,10 +448,12 @@ def write_summary(effect_df: pd.DataFrame, descriptive_df: pd.DataFrame, outpath
     lines.extend(["", "## Descriptive Age Differences", ""])
     for component in COMPONENT_ORDER:
         sensory = desc_wide[
-            (desc_wide["component"] == component) & (desc_wide["network_type"] == "sensory_motor")
+            (desc_wide["component"] == component)
+            & (desc_wide["network_type"] == "sensory_motor")
         ].iloc[0]
         higher = desc_wide[
-            (desc_wide["component"] == component) & (desc_wide["network_type"] == "higher_order")
+            (desc_wide["component"] == component)
+            & (desc_wide["network_type"] == "higher_order")
         ].iloc[0]
         lines.append(
             f"- {COMPONENT_LABELS[component]}: older-young difference in sensory/motor = "
@@ -443,34 +487,64 @@ def main() -> None:
     subject_type_df = build_subject_network_type_components(network_df)
 
     long_df = subject_type_df.melt(
-        id_vars=["subject_id", "age", "sex", "age_group", "mean_fd", "retained_minutes_after_scrub", "network_type"],
+        id_vars=[
+            "subject_id",
+            "age",
+            "sex",
+            "age_group",
+            "mean_fd",
+            "retained_minutes_after_scrub",
+            "network_type",
+        ],
         value_vars=COMPONENT_ORDER,
         var_name="component",
         value_name="value",
     )
-    long_df["component"] = pd.Categorical(long_df["component"], categories=COMPONENT_ORDER, ordered=True)
+    long_df["component"] = pd.Categorical(
+        long_df["component"], categories=COMPONENT_ORDER, ordered=True
+    )
 
     effect_df = build_effect_table(long_df)
     descriptive_df = build_descriptive_table(long_df)
 
-    subject_type_df.to_csv(output_dir / "subject_network_type_components.tsv", sep="\t", index=False)
-    long_df.to_csv(output_dir / "subject_network_type_components_long.tsv", sep="\t", index=False)
-    effect_df.to_csv(output_dir / "component_network_type_effects.tsv", sep="\t", index=False)
-    descriptive_df.to_csv(output_dir / "component_network_type_descriptives.tsv", sep="\t", index=False)
+    subject_type_df.to_csv(
+        output_dir / "subject_network_type_components.tsv", sep="\t", index=False
+    )
+    long_df.to_csv(
+        output_dir / "subject_network_type_components_long.tsv", sep="\t", index=False
+    )
+    effect_df.to_csv(
+        output_dir / "component_network_type_effects.tsv", sep="\t", index=False
+    )
+    descriptive_df.to_csv(
+        output_dir / "component_network_type_descriptives.tsv", sep="\t", index=False
+    )
 
     settings = pd.DataFrame(
         [
             {"setting": "sample_tsv", "value": str(sample_path)},
             {"setting": "connectivity_dir", "value": str(connectivity_dir)},
-            {"setting": "sensory_motor_networks", "value": ",".join(sorted(SENSORY_MOTOR))},
-            {"setting": "higher_order_networks", "value": ",".join(sorted(HIGHER_ORDER))},
+            {
+                "setting": "sensory_motor_networks",
+                "value": ",".join(sorted(SENSORY_MOTOR)),
+            },
+            {
+                "setting": "higher_order_networks",
+                "value": ",".join(sorted(HIGHER_ORDER)),
+            },
         ]
     )
-    settings.to_csv(output_dir / "component_network_type_settings.tsv", sep="\t", index=False)
+    settings.to_csv(
+        output_dir / "component_network_type_settings.tsv", sep="\t", index=False
+    )
 
     plot_component_panels(long_df, figures_dir / "component_network_type_by_group.png")
-    plot_interaction_effects(effect_df, figures_dir / "component_network_type_interactions.png")
-    write_summary(effect_df, descriptive_df, output_dir / "component_network_type_summary.md")
+    plot_interaction_effects(
+        effect_df, figures_dir / "component_network_type_interactions.png"
+    )
+    write_summary(
+        effect_df, descriptive_df, output_dir / "component_network_type_summary.md"
+    )
 
     print(f"Wrote grouped component analysis to {output_dir}")
     print(f"Wrote grouped component figures to {figures_dir}")

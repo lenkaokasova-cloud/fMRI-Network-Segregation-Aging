@@ -28,7 +28,6 @@ import numpy as np
 import pandas as pd
 from nilearn.connectome import ConnectivityMeasure
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -88,7 +87,9 @@ def load_denoising_summary(denoising_dir: Path) -> pd.DataFrame:
     missing = required.difference(summary.columns)
     if missing:
         missing_str = ", ".join(sorted(missing))
-        raise ValueError(f"Denoising summary is missing required columns: {missing_str}")
+        raise ValueError(
+            f"Denoising summary is missing required columns: {missing_str}"
+        )
     return summary
 
 
@@ -133,7 +134,11 @@ def mean_off_diagonal(matrix: np.ndarray) -> float:
 
 
 def proportional_segregation(within_mean: float, between_mean: float) -> float:
-    if not np.isfinite(within_mean) or not np.isfinite(between_mean) or np.isclose(within_mean, 0.0):
+    if (
+        not np.isfinite(within_mean)
+        or not np.isfinite(between_mean)
+        or np.isclose(within_mean, 0.0)
+    ):
         return float("nan")
     return float((within_mean - between_mean) / within_mean)
 
@@ -144,7 +149,9 @@ def compute_network_segregation(
     rows: list[dict[str, object]] = []
     for network, indices in groups.items():
         within = z_matrix[np.ix_(indices, indices)]
-        between_indices = [idx for idx in range(z_matrix.shape[0]) if idx not in indices]
+        between_indices = [
+            idx for idx in range(z_matrix.shape[0]) if idx not in indices
+        ]
         between = z_matrix[np.ix_(indices, between_indices)]
         within_mean = mean_off_diagonal(within)
         between_mean = float(between.mean()) if between.size else float("nan")
@@ -152,7 +159,9 @@ def compute_network_segregation(
         within_posonly = posonly_z_matrix[np.ix_(indices, indices)]
         between_posonly = posonly_z_matrix[np.ix_(indices, between_indices)]
         within_mean_posonly = mean_off_diagonal(within_posonly)
-        between_mean_posonly = float(between_posonly.mean()) if between_posonly.size else float("nan")
+        between_mean_posonly = (
+            float(between_posonly.mean()) if between_posonly.size else float("nan")
+        )
         raw_diff = within_mean - between_mean
         rows.append(
             {
@@ -173,13 +182,17 @@ def compute_network_segregation(
     return rows
 
 
-def compute_global_metrics(z_matrix: np.ndarray, groups: dict[str, list[int]]) -> dict[str, float]:
+def compute_global_metrics(
+    z_matrix: np.ndarray, groups: dict[str, list[int]]
+) -> dict[str, float]:
     within_vals: list[float] = []
     between_vals: list[float] = []
     for indices in groups.values():
         within = z_matrix[np.ix_(indices, indices)]
         within_vals.append(mean_off_diagonal(within))
-        between_indices = [idx for idx in range(z_matrix.shape[0]) if idx not in indices]
+        between_indices = [
+            idx for idx in range(z_matrix.shape[0]) if idx not in indices
+        ]
         between = z_matrix[np.ix_(indices, between_indices)]
         if between.size:
             between_vals.append(float(between.mean()))
@@ -191,7 +204,9 @@ def compute_global_metrics(z_matrix: np.ndarray, groups: dict[str, list[int]]) -
         "global_between_mean_z": global_between,
         "global_segregation": proportional_segregation(global_within, global_between),
         "global_segregation_raw_diff": raw_diff,
-        "global_segregation_prop": proportional_segregation(global_within, global_between),
+        "global_segregation_prop": proportional_segregation(
+            global_within, global_between
+        ),
     }
 
 
@@ -212,17 +227,22 @@ def main() -> None:
     if args.subjects:
         summary = summary[summary["subject_id"].isin(args.subjects)].copy()
     if summary.empty:
-        raise ValueError("No subjects remain to analyze after applying the requested filter.")
+        raise ValueError(
+            "No subjects remain to analyze after applying the requested filter."
+        )
 
-    atlas_labels_df = pd.read_csv(denoising_dir / "metrics" / "atlas_labels.tsv", sep="\t")
-    atlas_labels = [decode_label(label) for label in atlas_labels_df["parcel_label"].tolist()]
+    atlas_labels_df = pd.read_csv(
+        denoising_dir / "metrics" / "atlas_labels.tsv", sep="\t"
+    )
+    atlas_labels = [
+        decode_label(label) for label in atlas_labels_df["parcel_label"].tolist()
+    ]
     groups = network_groups(atlas_labels)
 
     kind_map = {
         "correlation": "correlation",
         "partial_correlation": "partial correlation",
     }
-    # I keep the estimator switch here so Pearson can stay primary and partial correlation can stay sensitivity-only.
     connectivity = ConnectivityMeasure(
         kind=kind_map[args.connectivity_kind],
         standardize="zscore_sample",
@@ -231,11 +251,12 @@ def main() -> None:
     network_rows: list[dict[str, object]] = []
     z_matrices: list[np.ndarray] = []
 
-    for row in summary.sort_values(["age_group", "age", "subject_id"]).itertuples(index=False):
+    for row in summary.sort_values(["age_group", "age", "subject_id"]).itertuples(
+        index=False
+    ):
         subject = row.subject_id
         timeseries_path = resolve_project_path(row.timeseries_file)
         time_series = np.load(timeseries_path)
-        # This is where the denoised parcel series finally become subject-level connectivity matrices.
         corr = connectivity.fit_transform([time_series])[0]
         z_matrix = fisher_z(corr)
         np.fill_diagonal(z_matrix, 0.0)
@@ -243,7 +264,9 @@ def main() -> None:
         z_matrices.append(z_matrix)
 
         np.save(matrices_dir / f"{subject}_forward_z_matrix.npy", z_matrix)
-        save_matrix_csv(matrices_dir / f"{subject}_forward_z_matrix.csv", z_matrix, atlas_labels)
+        save_matrix_csv(
+            matrices_dir / f"{subject}_forward_z_matrix.csv", z_matrix, atlas_labels
+        )
 
         global_metrics = compute_global_metrics(z_matrix, groups)
         global_metrics_posonly = compute_global_metrics(posonly_z_matrix, groups)
@@ -261,13 +284,21 @@ def main() -> None:
                 "mean_fd": float(row.mean_fd),
                 "pct_fd_gt_0p2": float(row.pct_fd_gt_0p2),
                 **global_metrics,
-                "global_within_mean_z_posonly": global_metrics_posonly["global_within_mean_z"],
-                "global_between_mean_z_posonly": global_metrics_posonly["global_between_mean_z"],
-                "global_segregation_prop_posonly": global_metrics_posonly["global_segregation_prop"],
+                "global_within_mean_z_posonly": global_metrics_posonly[
+                    "global_within_mean_z"
+                ],
+                "global_between_mean_z_posonly": global_metrics_posonly[
+                    "global_between_mean_z"
+                ],
+                "global_segregation_prop_posonly": global_metrics_posonly[
+                    "global_segregation_prop"
+                ],
             }
         )
 
-        for network_row in compute_network_segregation(z_matrix, posonly_z_matrix, groups):
+        for network_row in compute_network_segregation(
+            z_matrix, posonly_z_matrix, groups
+        ):
             network_row.update(
                 {
                     "subject_id": subject,
@@ -275,7 +306,9 @@ def main() -> None:
                     "sex": row.sex,
                     "age_group": row.age_group,
                     "retained_volumes": int(row.retained_volumes),
-                    "retained_minutes_after_scrub": float(row.retained_minutes_after_scrub),
+                    "retained_minutes_after_scrub": float(
+                        row.retained_minutes_after_scrub
+                    ),
                     "mean_fd": float(row.mean_fd),
                 }
             )
@@ -284,7 +317,9 @@ def main() -> None:
     if z_matrices:
         mean_matrix = np.mean(z_matrices, axis=0)
         np.save(matrices_dir / "group_mean_z_matrix.npy", mean_matrix)
-        save_matrix_csv(matrices_dir / "group_mean_z_matrix.csv", mean_matrix, atlas_labels)
+        save_matrix_csv(
+            matrices_dir / "group_mean_z_matrix.csv", mean_matrix, atlas_labels
+        )
 
     pd.DataFrame(subject_rows).to_csv(
         metrics_dir / "subject_global_segregation.tsv", sep="\t", index=False
@@ -310,7 +345,6 @@ def main() -> None:
             }
         ]
     ).to_csv(metrics_dir / "connectivity_settings.tsv", sep="\t", index=False)
-    # I save the formulas too so the exact segregation definition is never ambiguous later on.
 
     print(f"Processed {len(subject_rows)} subjects from {denoising_dir}")
     print(f"Wrote subject metrics to {metrics_dir / 'subject_global_segregation.tsv'}")
