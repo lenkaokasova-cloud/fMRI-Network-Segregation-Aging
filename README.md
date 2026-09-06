@@ -1,6 +1,6 @@
 # fMRI-Network-Segregation-Aging
 
-This repo contains the main workflow I used for my dissertation analysis of resting-state network segregation in OpenNeuro `ds005752`.
+This repo contains the main workflow I used for my dissertation analysis of resting-state network segregation in OpenNeuro dataset `ds005752`.
 
 ## Main Idea
 
@@ -24,10 +24,15 @@ The primary branch of the project is:
 conda env create -f environment.yml
 conda activate fmri-aging
 ```
+## Data and Output Availability
+
+This repository contains the analysis code and documentation, but does not include raw neuroimaging data, fMRIPrep derivatives, participant-level processed data, or generated analysis outputs. These files are excluded because of their size and data-governance considerations.
+
+Raw data are available from OpenNeuro dataset `ds005752`. Reproducing the exact dissertation outputs requires rerunning the documented workflow, including the recorded manual fMRIPrep quality-control review and final TR = 3s sample selection.
 
 ## Repo Layout
 
-The `code/` folder is split by purpose.
+The `code/` folder is split by purpose:
 
 - `code/primary/`
   Main scripts needed to go from screened participants to the primary analysis outputs.
@@ -75,8 +80,6 @@ python code/followup/17_run_younger_reference_deviation_analysis.py
 The locked primary sample for the dissertation is:
 
 - `data/processed/screening/ds005752_final_analysis_sample_tr_3s.tsv`
-
-That is the sample that should be treated as primary.
 
 ## Main Scripts
 
@@ -165,7 +168,3 @@ That is the sample that should be treated as primary.
 
 - analysis outputs:
   `data/processed/analysis/`
-
-## Notes
-
-Working notes used during analysis and dissertation drafting are kept in `docs/`.
